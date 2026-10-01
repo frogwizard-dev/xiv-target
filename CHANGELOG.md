@@ -1,5 +1,9 @@
 # XIVTarget
 
+## 0.3.2
+
+- No changes in the game. From this version, releases are published automatically to CurseForge and GitHub.
+
 ## 0.3.1
 
 ### Options

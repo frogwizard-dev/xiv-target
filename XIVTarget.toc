@@ -2,6 +2,7 @@
 ## Title: XIVTarget
 ## Notes: An FFXIV-style target bar: a thin gauge with the name above, cast and status effects around it, and your target's target alongside.
 ## Version: 0.3.1
+## X-Curse-Project-ID: 1719605
 ## OptionalDeps: EllesmereUI
 ## SavedVariables: XIVTargetDB
 ## IconTexture: Interface\Icons\Ability_Hunter_SniperShot

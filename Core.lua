@@ -24,6 +24,7 @@ ns.defaults = {
     },
     tot = { enabled = true, width = 150, gap = 40, template = "name" },
     clicks = true, -- left-click the bars to target, right-click for the unit menu
+    hideTargetFrame = false, -- hide Blizzard's target frame (its combo points stay)
     absorb = true, -- the target's shields drawn on its gauge as a striped fill
     -- Small icons by the name. anchor: "left" of the name, "right" past the bar's end, or
     -- "above" the name; x/y nudge the whole row from there.

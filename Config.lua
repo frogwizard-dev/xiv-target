@@ -167,7 +167,9 @@ function Config:BuildBar(p)
     place(Checkbox(p, "Unlock to move (drag the bar; shows a preview)",
         function() return not db.locked end, function(v) db.locked = not v end), 28)
     place(Checkbox(p, "Click to target, right-click for the menu",
-        function() return db.clicks end, function(v) db.clicks = v end), 34)
+        function() return db.clicks end, function(v) db.clicks = v end), 28)
+    place(Checkbox(p, "Hide Blizzard's target frame",
+        function() return db.hideTargetFrame end, function(v) db.hideTargetFrame = v end), 34)
     place(Stepper(p, "Scale", 0.5, 2, 0.05, function() return db.scale end, function(v) db.scale = v end, "%.2f"), 26)
     place(Stepper(p, "Width", 150, 900, 10, function() return db.width end, function(v) db.width = v end), 26)
     place(Stepper(p, "Bar height", 2, 20, 1, function() return db.height end, function(v) db.height = v end), 32)

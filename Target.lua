@@ -379,6 +379,8 @@ function Target:Apply()
     f:SetPoint(db.point[1], UIParent, db.point[3], db.point[4], db.point[5])
     f:EnableMouse(not db.locked)
     f.unlockTint:SetShown(not db.locked)
+    -- Combo points are drawn on Blizzard's target frame, so they stay.
+    ns.HideBlizzardFrame("TargetFrame", db.hideTargetFrame, { "ComboFrame" })
 
     self.gauge:SetHeight(db.height)
     self.gauge:SetTexture(db.texture)

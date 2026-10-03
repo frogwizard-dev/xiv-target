@@ -1,5 +1,11 @@
 # XIVTarget
 
+## 0.4.1
+
+### Fixes
+- Fixed a "file not found" font error after EllesmereUI is turned off or removed while its font (Expressway) is chosen. The game's standard font is used until you pick another.
+- Hiding Blizzard's target frame now works alongside other add-ons that hide it the same way, instead of the two undoing each other.
+
 ## 0.4.0
 
 ### Blizzard's target frame

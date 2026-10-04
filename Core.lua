@@ -106,6 +106,16 @@ local function HealthPercent(unit)
 end
 
 -- Fills a FontString from a template for a unit. fake = values for the unlocked preview.
+-- A unit's name as the game's own frames show it: on Forever that includes the surname
+-- (GetUnitName's second argument), where UnitName gives only the first name.
+local function FullName(unit)
+    if GetUnitName then
+        local ok, name = pcall(GetUnitName, unit, true)
+        if ok and name then return name end
+    end
+    return UnitName(unit)
+end
+
 function ns.SetUnitText(fs, template, unit, fake)
     if not template or strtrim(template) == "" then
         fs:Hide()
@@ -113,7 +123,7 @@ function ns.SetUnitText(fs, template, unit, fake)
     end
     fs:Show()
     local vals = fake or {
-        name = UnitName(unit), level = Level(unit),
+        name = FullName(unit), level = Level(unit),
         value = UnitHealth(unit), max = UnitHealthMax(unit), percent = HealthPercent(unit),
     }
     local c = ns.Compile(template)

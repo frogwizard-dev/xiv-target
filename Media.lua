@@ -16,7 +16,12 @@ local BUILTIN = {
     },
 }
 
-local GROUPS = { "Bundled", "Blizzard", "EllesmereUI", "Shared media" }
+-- FrogUI's own bar textures (flat and matte, made for it), listed wherever FrogUI is loaded.
+local FROG_BARS = "Interface\\AddOns\\FrogUI\\Media\\Bars\\"
+local FROG_BAR_NAMES = { "Matte", "Soft", "Grain", "Satin", "Inset", "Brushed", "Stripes",
+    "Dark Matte", "Dark Soft", "Dark Grain", "Dark Inset" }
+
+local GROUPS = { "Frog", "Bundled", "Blizzard", "EllesmereUI", "Shared media" }
 local MICHROMA = "Interface\\AddOns\\XIVTarget\\Fonts\\Michroma.ttf" -- wide, like FFXIV's gauge numbers
 
 -- XIVTarget\Fonts\XIV.ttf ships as M PLUS 1p Medium; replace the file (keeping the name) to
@@ -38,6 +43,10 @@ function Media:List(kind)
         add("Bundled", "Michroma (wide)", MICHROMA)
         add("Bundled", "Source Sans 3 (Myriad-like)", "Interface\\AddOns\\XIVTarget\\Fonts\\SourceSans3.ttf")
         add("Bundled", "M PLUS 1p", CUSTOM_FONT)
+    end
+    local isLoaded = (C_AddOns and C_AddOns.IsAddOnLoaded) or IsAddOnLoaded
+    if kind == "statusbar" and isLoaded and isLoaded("FrogUI") then
+        for _, name in ipairs(FROG_BAR_NAMES) do add("Frog", name, FROG_BARS .. name .. ".tga") end
     end
     for _, m in ipairs(BUILTIN[kind]) do
         add("Blizzard", m.name, m.path)

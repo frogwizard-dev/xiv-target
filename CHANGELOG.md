@@ -1,5 +1,13 @@
 # XIVTarget
 
+## 0.4.2
+
+### Fixes
+- Names include the surname on Forever, as the game's own frames show them (it showed only the first name).
+
+### Options
+- Listed with the rest of Frog Wizard's add-ons: under a "Frog Wizard" heading in the AddOn list, and in its own "Frog Wizard" section of Options > AddOns, whose page lists them all with a button to each one's settings.
+
 ## 0.4.1
 
 ### Fixes

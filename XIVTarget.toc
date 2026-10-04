@@ -1,7 +1,8 @@
 ## Interface: 16001, 120000, 120001, 120005, 120007, 120100
 ## Title: XIVTarget
+## Category: Frog Wizard
 ## Notes: An FFXIV-style target bar: a thin gauge with the name above, cast and status effects around it, and your target's target alongside.
-## Version: 0.4.1
+## Version: 0.4.2
 ## X-Curse-Project-ID: 1719605
 ## OptionalDeps: EllesmereUI
 ## SavedVariables: XIVTargetDB

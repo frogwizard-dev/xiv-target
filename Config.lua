@@ -309,7 +309,7 @@ function Config:Toggle()
 end
 
 -- Its entry in the game's Options > AddOns list (Options.lua).
-ns.AddOptionsPanel({
+FrogLib.Options.Add("XIVTarget", ns, {
     open = function()
         if not (Config.frame and Config.frame:IsShown()) then Config:Toggle() end
     end,

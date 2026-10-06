@@ -18,11 +18,21 @@ ns.defaults = {
         outline = "OUTLINE",
         size = 12,
         tinted = true, -- text takes a light version of the bar's colour, like FFXIV
-        -- Templates: words level, name, value, max, percent (percent.1 for a decimal).
+        classColor = true, -- the `class` word in the class's colour (players)
+        -- Templates: words level, name, class, value, max, percent (percent.1 for a decimal),
+        -- power, powermax, powerpercent, powertype.
         left = "Lv level name",
         right = "percent",
     },
     tot = { enabled = true, width = 150, gap = 40, template = "name" },
+    -- The target's power (mana, rage, energy) on a slimmer gauge under the health gauge: `width`
+    -- per cent as long, lined up by `align` ("left", "center", "right"), `gap` pixels below it
+    -- and nudged x pixels sideways. text: a template whose value, max and percent are the
+    -- power's, printed under the gauge's right end; empty hides it.
+    power = {
+        enabled = false, height = 2, width = 100, align = "left", gap = 6, x = 0,
+        hideEmpty = true, text = "value", textSize = 10,
+    },
     clicks = true, -- left-click the bars to target, right-click for the unit menu
     hideTargetFrame = false, -- hide Blizzard's target frame (its combo points stay)
     absorb = true, -- the target's shields drawn on its gauge as a striped fill
@@ -31,6 +41,9 @@ ns.defaults = {
     icons = {
         enabled = true, size = 16, anchor = "left", x = 0, y = 0,
         raid = true, leader = true, role = true, pvp = true, quest = true,
+        -- A player's class icon: first in the row, and (classToT) before your target's
+        -- target's name. classSize: its own size, for both.
+        class = false, classToT = true, classSize = 16,
     },
     -- offset: how far above the health bar the cast bar floats (its spell name hangs below it).
     cast = { enabled = true, width = 200, height = 3, offset = 44, showTime = true },
@@ -41,7 +54,7 @@ ns.defaults = {
     },
 }
 
-ns.issecret = issecretvalue or function() return false end
+ns.issecret = FrogLib.issecret
 
 function ns.Print(...)
     print("|cfff5dc8fXIVTarget|r:", ...)
@@ -58,77 +71,17 @@ local function CopyDefaults(src, dst)
     end
 end
 
--- Text templates: "Lv level name" -> ("Lv %s %s", {level, name}). Same scheme as
--- PersonalResourceTweaks, plus the level and name words. Values may be secret, so they're
--- only ever formatted engine-side by SetFormattedText.
-local compiled = {}
-function ns.Compile(template)
-    local c = compiled[template]
-    if c then return c end
-    local args = {}
-    local pattern = template:gsub("%%", "%%%%")
-    pattern = pattern:gsub("||", "|")
-    pattern = pattern:gsub("|", "||")
-    pattern = pattern:gsub("(%a+)(%.?%d*)", function(word, suffix)
-        local w = word:lower()
-        if w == "name" or w == "level" then
-            args[#args + 1] = w
-            return "%s" .. suffix
-        elseif w == "value" or w == "max" then
-            args[#args + 1] = w
-            return "%d" .. suffix
-        elseif w == "percent" then
-            args[#args + 1] = "percent"
-            local places = tonumber(suffix:match("^%.(%d)"))
-            if places then return "%." .. math.min(places, 3) .. "f%%" end
-            return "%d%%" .. suffix
-        end
-    end)
-    c = { pattern = pattern, args = args }
-    compiled[template] = c
-    return c
-end
-
-local function Level(unit)
-    local level = UnitLevel(unit)
-    if ns.issecret(level) then return level end
-    if not level or level < 0 then return "??" end -- skull-level bosses
-    return tostring(level)
-end
-
-local function HealthPercent(unit)
-    if UnitHealthPercent and CurveConstants then
-        return UnitHealthPercent(unit, true, CurveConstants.ScaleTo100)
-    end
-    local h, m = UnitHealth(unit), UnitHealthMax(unit)
-    if ns.issecret(h) or ns.issecret(m) or m == 0 then return 0 end
-    return h / m * 100
-end
-
--- Fills a FontString from a template for a unit. fake = values for the unlocked preview.
--- A unit's name as the game's own frames show it: on Forever that includes the surname
--- (GetUnitName's second argument), where UnitName gives only the first name.
-local function FullName(unit)
-    if GetUnitName then
-        local ok, name = pcall(GetUnitName, unit, true)
-        if ok and name then return name end
-    end
-    return UnitName(unit)
-end
-
-function ns.SetUnitText(fs, template, unit, fake)
-    if not template or strtrim(template) == "" then
-        fs:Hide()
-        return
-    end
-    fs:Show()
-    local vals = fake or {
-        name = FullName(unit), level = Level(unit),
-        value = UnitHealth(unit), max = UnitHealthMax(unit), percent = HealthPercent(unit),
-    }
-    local c = ns.Compile(template)
-    local a = c.args
-    pcall(fs.SetFormattedText, fs, c.pattern, vals[a[1]], vals[a[2]], vals[a[3]], vals[a[4]], vals[a[5]], vals[a[6]])
+-- Text templates and their words (level, name, class, value, max, percent, power, powermax,
+-- powerpercent, powertype): FrogLib.Text and FrogLib.Unit, shared with FrogTarget and FrogFrames.
+-- Values may be secret, so they're only ever formatted engine-side by SetFormattedText.
+-- Fills a FontString from a template for a unit. fake = values for the unlocked preview (its
+-- class word: class plus classFile, coloured); power = value, max and percent are the unit's
+-- power rather than its health (the power gauge's text).
+local textOpts = {}
+function ns.SetUnitText(fs, template, unit, fake, power)
+    textOpts.fake, textOpts.power = fake or nil, power
+    textOpts.classColor = ns.db.text.classColor -- the class word in the class's colour (players)
+    FrogLib.Unit.SetText(fs, template, unit, textOpts)
 end
 
 function ns.Refresh()

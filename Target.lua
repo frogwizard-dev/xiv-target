@@ -1,52 +1,42 @@
-local _, ns = ...
+local ADDON, ns = ...
 local Target = {}
 ns.Target = Target
 
-local issecret = ns.issecret
-local WHITE = "Interface\\Buttons\\WHITE8X8"
-local ELAPSED = Enum.StatusBarTimerDirection and Enum.StatusBarTimerDirection.ElapsedTime
-local REMAINING = Enum.StatusBarTimerDirection and Enum.StatusBarTimerDirection.RemainingTime
-local IMMEDIATE = Enum.StatusBarInterpolation and Enum.StatusBarInterpolation.Immediate
+local issecret, Safe = FrogLib.issecret, FrogLib.Safe
+-- Reading casts and when the cast bar shows (FrogLib.Cast), the curve an empty power gauge fades
+-- by (FrogLib.Curve), the colours (FrogLib.Color), the icons by the name (FrogLib.Icons) and the
+-- click buttons (FrogLib.Secure) are shared with Frog Wizard's other bars.
+local Cast, Curve, Color, Icons = FrogLib.Cast, FrogLib.Curve, FrogLib.Color, FrogLib.Icons
 
 -- Shown while unlocked with nothing targeted, so there's something to drag and style.
-local FAKE = { name = "Striking Dummy", level = "70", value = 76, max = 100, percent = 76, shield = 12 }
-local FAKE_TOT = { name = "You", level = "70", value = 100, max = 100, percent = 100 }
-
-local CAST_EVENTS = {
-    "UNIT_SPELLCAST_START", "UNIT_SPELLCAST_STOP", "UNIT_SPELLCAST_FAILED", "UNIT_SPELLCAST_INTERRUPTED",
-    "UNIT_SPELLCAST_DELAYED", "UNIT_SPELLCAST_CHANNEL_START", "UNIT_SPELLCAST_CHANNEL_UPDATE",
-    "UNIT_SPELLCAST_CHANNEL_STOP", "UNIT_SPELLCAST_EMPOWER_START", "UNIT_SPELLCAST_EMPOWER_UPDATE",
-    "UNIT_SPELLCAST_EMPOWER_STOP", "UNIT_SPELLCAST_INTERRUPTIBLE", "UNIT_SPELLCAST_NOT_INTERRUPTIBLE",
+local MANA_NAME = type(MANA) == "string" and MANA or "Mana"
+local FAKE = {
+    name = "Striking Dummy", level = "70", value = 76, max = 100, percent = 76, shield = 12,
+    class = LOCALIZED_CLASS_NAMES_MALE and LOCALIZED_CLASS_NAMES_MALE.PALADIN or "Paladin", classFile = "PALADIN",
+    power = 62, powermax = 100, powerpercent = 62, powertype = MANA_NAME,
+}
+-- Its class is filled in from yours when shown.
+local FAKE_TOT = {
+    name = "You", level = "70", value = 100, max = 100, percent = 100,
+    power = 100, powermax = 100, powerpercent = 100, powertype = MANA_NAME,
 }
 
-local XIV_ENGAGED = { 0.95, 0.42, 0.50 } -- pink-red: fighting
-local XIV_PASSIVE = { 0.96, 0.86, 0.56 } -- pale gold: not engaged yet
-local XIV_FRIEND = { 0.50, 0.78, 1.00 }  -- light blue: you, players, friendly NPCs
+local POWER_EVENTS = { UNIT_POWER_UPDATE = true, UNIT_POWER_FREQUENT = true, UNIT_MAXPOWER = true, UNIT_DISPLAYPOWER = true }
 
-local function Safe(v)
-    if issecret(v) then return nil end
-    return v
-end
+-- "xiv": FFXIV's (FrogLib.Color.XIV). "reaction": tapped grey, players in their class colour,
+-- then hostile red / neutral yellow / friendly green; `color` when the game won't say.
+local REACTION = {
+    tapped = { r = 0.55, g = 0.55, b = 0.55 }, class = true,
+    hostile = { r = 0.90, g = 0.32, b = 0.25 }, neutral = { r = 0.95, g = 0.85, b = 0.35 },
+    friendly = { r = 0.45, g = 0.85, b = 0.40 },
+}
 
 local function BarColor(unit)
     local db = ns.db
-    if unit and db.colorMode == "xiv" then
-        local c
-        if Safe(UnitIsFriend("player", unit)) then
-            c = XIV_FRIEND
-        elseif Safe(UnitAffectingCombat(unit)) then
-            c = XIV_ENGAGED
-        else
-            c = XIV_PASSIVE
-        end
-        return c[1], c[2], c[3]
-    elseif unit and db.colorMode == "reaction" then
-        local reaction = Safe(UnitReaction(unit, "player"))
-        if reaction then
-            if reaction <= 3 then return 0.90, 0.32, 0.25 end
-            if reaction == 4 then return 0.95, 0.85, 0.35 end
-            return 0.45, 0.85, 0.40
-        end
+    if unit and db.colorMode == "xiv" then return Color.XIVUnit(unit) end
+    if unit and db.colorMode == "reaction" then
+        local r, g, b = Color.Unit(unit, REACTION)
+        if r then return r, g, b end
     end
     return db.color.r, db.color.g, db.color.b
 end
@@ -54,95 +44,19 @@ end
 -- Text in a light version of the bar's colour, with a dark outline so it lifts off the world.
 local function TintText(fs, r, g, b)
     if ns.db.text.tinted then
-        fs:SetTextColor(r + (1 - r) * 0.55, g + (1 - g) * 0.55, b + (1 - b) * 0.55)
+        fs:SetTextColor(Color.Lighten(r, g, b, 0.55))
     else
         fs:SetTextColor(1, 1, 1)
     end
 end
 
 ------------------------------------------------------------------------------
--- Icons beside the name: raid marker, leader/assistant, group role, PvP, quest mob
+-- Icons beside the name: class, raid marker, leader/assistant, group role, PvP, quest mob. Each
+-- is FrogLib.Icons' (SHOW for a unit, PREVIEW for the unlocked sample); the raid marker is a
+-- FontString, as which mark it is can be secret.
 ------------------------------------------------------------------------------
 
-local ICON_ORDER = { "raid", "leader", "role", "pvp", "quest" } -- nearest the name first
-local RAID_ICON = "Interface\\TargetingFrame\\UI-RaidTargetingIcon_"
-local PVP_COORDS = { 0.08, 0.58, 0.045, 0.545 } -- the old PvP badges sit in the corner of a larger file
-local ROLE_ATLAS = { TANK = "roleicon-tiny-tank", HEALER = "roleicon-tiny-healer", DAMAGER = "roleicon-tiny-dps" }
-
--- Modern atlas where the client has it, otherwise the classic file.
-local function SetIcon(tex, atlas, file, coords)
-    if atlas and C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(atlas) then
-        tex:SetAtlas(atlas)
-    else
-        tex:SetTexture(file)
-        tex:SetTexCoord(unpack(coords or { 0, 1, 0, 1 }))
-    end
-end
-
--- The raid marker is a FontString showing the icon as inline markup: the index can be secret,
--- and SetFormattedText is the one place a secret can still be displayed.
-local function RaidMarkup(size)
-    return "|T" .. RAID_ICON .. "%d:" .. size .. ":" .. size .. "|t"
-end
-
--- Each sets its icon and returns true if it applies to the unit.
-local SHOW = {}
-function SHOW.raid(fs, unit, size)
-    local index = GetRaidTargetIndex(unit)
-    if not issecret(index) and not index then return false end
-    return (pcall(fs.SetFormattedText, fs, RaidMarkup(size), index))
-end
-function SHOW.leader(tex, unit)
-    if Safe(UnitIsGroupLeader(unit)) then
-        SetIcon(tex, "UI-HUD-UnitFrame-Player-Group-LeaderIcon", "Interface\\GroupFrame\\UI-Group-LeaderIcon")
-        return true
-    elseif Safe(UnitIsGroupAssistant(unit)) then
-        SetIcon(tex, "UI-HUD-UnitFrame-Player-Group-AssistantIcon", "Interface\\GroupFrame\\UI-Group-AssistantIcon")
-        return true
-    end
-    return false
-end
-function SHOW.role(tex, unit)
-    local role = UnitGroupRolesAssigned and Safe(UnitGroupRolesAssigned(unit))
-    if not role or not ROLE_ATLAS[role] then return false end
-    SetIcon(tex, ROLE_ATLAS[role], "Interface\\LFGFrame\\UI-LFG-ICON-PORTRAITROLES",
-        GetTexCoordsForRoleSmallCircle and { GetTexCoordsForRoleSmallCircle(role) })
-    return true
-end
--- Players only: faction guards are flagged too, and a badge on every guard is noise.
-function SHOW.pvp(tex, unit)
-    if not Safe(UnitIsPlayer(unit)) then return false end
-    if Safe(UnitIsPVPFreeForAll(unit)) then
-        SetIcon(tex, "UI-HUD-UnitFrame-Player-PVP-FFAIcon", "Interface\\TargetingFrame\\UI-PVP-FFA", PVP_COORDS)
-        return true
-    end
-    if Safe(UnitIsPVP(unit)) then
-        local faction = Safe(UnitFactionGroup(unit))
-        if faction == "Horde" or faction == "Alliance" then
-            SetIcon(tex, "UI-HUD-UnitFrame-Player-PVP-" .. faction .. "Icon",
-                "Interface\\TargetingFrame\\UI-PVP-" .. faction, PVP_COORDS)
-            return true
-        end
-    end
-    return false
-end
-function SHOW.quest(tex, unit)
-    if not Safe(UnitIsQuestBoss(unit)) then return false end
-    SetIcon(tex, "UI-HUD-UnitFrame-Target-PortraitOn-Boss-Quest", "Interface\\TargetingFrame\\PortraitQuestBadge")
-    return true
-end
-
--- Samples for the unlocked preview.
-local PREVIEW = {
-    raid = function(fs, size)
-        fs:SetFormattedText(RaidMarkup(size), 1)
-        return true
-    end,
-    leader = function(tex)
-        SetIcon(tex, "UI-HUD-UnitFrame-Player-Group-LeaderIcon", "Interface\\GroupFrame\\UI-Group-LeaderIcon")
-        return true
-    end,
-}
+local ICON_ORDER = { "class", "raid", "leader", "role", "pvp", "quest" } -- nearest the name first
 
 local function Text(parent)
     -- A default font up front: SetText errors on a FontString with none, and the configured
@@ -190,6 +104,7 @@ function Target:Init()
     self.right:SetJustifyH("RIGHT")
     self.left:SetWordWrap(false)
 
+    self:BuildPower()
     self:BuildCast()
     self:BuildToT()
     self.icons = {}
@@ -210,7 +125,10 @@ function Target:Init()
     f:RegisterUnitEvent("UNIT_LEVEL", "target")
     f:RegisterUnitEvent("UNIT_FACTION", "target")
     f:RegisterUnitEvent("UNIT_FLAGS", "target") -- entering/leaving combat recolours the bar
-    for _, event in ipairs(CAST_EVENTS) do
+    for event in pairs(POWER_EVENTS) do
+        pcall(f.RegisterUnitEvent, f, event, "target")
+    end
+    for _, event in ipairs(Cast.EVENTS) do
         pcall(f.RegisterUnitEvent, f, event, "target")
     end
     f:SetScript("OnEvent", function(_, event)
@@ -221,6 +139,9 @@ function Target:Init()
             if self.clicksPending then self:SetupClicks() end
         elseif event:find("^UNIT_SPELLCAST") then
             self:UpdateCast(event)
+        elseif POWER_EVENTS[event] then
+            self:UpdatePower(false)
+            self:UpdatePowerWords()
         else
             self:Update(false)
         end
@@ -239,6 +160,17 @@ function Target:Init()
     self:Apply()
 end
 
+-- The power gauge: a slimmer line of the same kind under the health gauge, its number hanging
+-- under its right end (as FFXIV prints a party member's MP). The text is on the gauge, so it
+-- fades out with it (power.hideEmpty).
+function Target:BuildPower()
+    local p = ns.CreateGauge(self.frame)
+    p.text = Text(p.bar)
+    p.text:SetJustifyH("RIGHT")
+    p.bar:Hide()
+    self.power = p
+end
+
 -- FFXIV shows an enemy's cast as a glowing white-gold line floating over the right half of
 -- the bar, with the spell name hanging underneath it.
 function Target:BuildCast()
@@ -254,15 +186,45 @@ function Target:BuildCast()
     c.time = Text(c)
     c.time:SetPoint("RIGHT", c, "LEFT", -8, 0)
     c.time:SetJustifyH("RIGHT")
+    -- What's on it, as FrogLib's driver decides.
+    c.driver = Cast.NewDriver({
+        show = function(info)
+            Cast.Fill(c, info)
+            c.label:SetText(info.text)
+            if Cast.Locked(info) then
+                g:SetColor(0.6, 0.6, 0.6)
+            else
+                g:SetColor(1, 0.72, 0.3)
+            end
+            c:Show()
+        end,
+        -- Held briefly so an interrupt is visible, as FFXIV does.
+        hold = function(event)
+            c:SetMinMaxValues(0, 1)
+            c:SetValue(1)
+            g:SetColor(0.85, 0.2, 0.15)
+            c.label:SetText(event == "UNIT_SPELLCAST_FAILED" and FAILED or INTERRUPTED)
+        end,
+        -- Unlocked: a sample cast so its position can be judged, unless there's a real one.
+        sample = function()
+            c:SetMinMaxValues(0, 1)
+            c:SetValue(0.6)
+            g:SetColor(1, 0.72, 0.3)
+            c.label:SetText("Spell name")
+            c.time:SetText(ns.db.cast.showTime and "1.4" or "")
+            c:Show()
+        end,
+        hide = function() c:Hide() end,
+        refresh = function() self:UpdateCast() end,
+    })
     c:SetScript("OnUpdate", function(bar)
-        if not ns.db.cast.showTime or bar.holdUntil then
+        local d = bar.driver
+        if d.sample then return end
+        if not ns.db.cast.showTime or d.holdUntil then
             bar.time:SetText("")
             return
         end
-        local ok, duration = pcall(bar.GetTimerDuration, bar)
-        if ok and duration then
-            pcall(bar.time.SetFormattedText, bar.time, "%.1f", duration:GetRemainingDuration())
-        end
+        Cast.ShowTime(bar, bar.time)
     end)
     c:Hide()
     self.cast = c
@@ -280,6 +242,8 @@ function Target:BuildToT()
     t.name:SetPoint("BOTTOMLEFT", t.gauge.bar, "TOPLEFT", 1, 4)
     t.name:SetJustifyH("LEFT")
     t.name:SetWordWrap(false)
+    t.classIcon = t:CreateTexture(nil, "OVERLAY") -- before the name (icons.classToT)
+    t.classIcon:Hide()
     t:Hide()
     self.tot = t
 end
@@ -289,37 +253,12 @@ end
 ------------------------------------------------------------------------------
 
 -- The bars themselves are plain frames, so clicks go to secure buttons laid over them and
--- shown by RegisterUnitWatch. The buttons copy the bar's position rather than anchoring to it:
--- anything a secure frame is anchored to becomes protected too, and the bar couldn't then be
--- shown or hidden in combat (ADDON_ACTION_BLOCKED on XIVTargetFrame:SetShown). On 12.x a unit button's own "togglemenu" is gated and silently
--- does nothing, so right-click runs "/click" on a hidden SecureActionButton child whose
--- togglemenu isn't gated (the same route EllesmereUI's unit frames use).
+-- shown by RegisterUnitWatch (FrogLib.Secure's: right-click opens the unit menu). The buttons copy
+-- the bar's position rather than anchoring to it: anything a secure frame is anchored to becomes
+-- protected too, and the bar couldn't then be shown or hidden in combat (ADDON_ACTION_BLOCKED on
+-- XIVTargetFrame:SetShown).
 local function ClickButton(name, unit)
-    local b = CreateFrame("Button", name, UIParent, "SecureUnitButtonTemplate")
-    b:SetAttribute("unit", unit)
-    b:SetAttribute("*type1", "target")
-    b:RegisterForClicks("AnyUp")
-
-    local menu = CreateFrame("Button", name .. "Menu", b, "SecureActionButtonTemplate")
-    menu:SetSize(1, 1)
-    menu:EnableMouse(false)
-    menu:RegisterForClicks("AnyUp")
-    for i = 1, 5 do menu:SetAttribute("type" .. i, "togglemenu") end
-    menu:SetAttribute("useparent-unit", true)
-    menu:SetAttribute("useOnKeyDown", false) -- act on the up-click whatever the key-down setting
-    b:SetAttribute("*type2", "macro")
-    b:SetAttribute("*macrotext2", "/click " .. name .. "Menu")
-
-    b:SetScript("OnEnter", function(self)
-        GameTooltip_SetDefaultAnchor(GameTooltip, self)
-        GameTooltip:SetUnit(unit)
-        GameTooltip:Show()
-    end)
-    b:SetScript("OnLeave", function(self)
-        if GameTooltip:IsOwned(self) then GameTooltip:Hide() end
-    end)
-    b:Hide()
-    return b
+    return (FrogLib.Secure.UnitButton(name, unit, { tooltip = true }))
 end
 
 -- Secure frames can only be placed and shown out of combat; changes made in combat wait.
@@ -352,7 +291,7 @@ function Target:SetupClicks()
     c:ClearAllPoints()
     c:SetPoint(db.point[1], UIParent, db.point[3], db.point[4], db.point[5])
     c:SetSize(db.width, self.frame:GetHeight())
-    c:SetHitRectInsets(-2, -2, -2, -6)
+    c:SetHitRectInsets(-2, -2, -2, -(6 + self:PowerDrop())) -- down over a power gauge too
     watch(c, on)
 
     -- Target's target: its gauge starts `gap` past the end of the target bar. Anchoring one
@@ -370,6 +309,54 @@ end
 -- Settings
 ------------------------------------------------------------------------------
 
+-- How far the power gauge and its text reach below the health gauge, so the status effects
+-- clear them. From the settings alone, not from whether the target has power, so nothing
+-- jumps about from one target to the next.
+function Target:PowerDrop()
+    local cfg = ns.db.power
+    if not cfg.enabled then return 0 end
+    local drop = cfg.gap + cfg.height
+    if cfg.text and strtrim(cfg.text) ~= "" then drop = drop + cfg.textSize + 3 end
+    return drop
+end
+
+function Target:ApplyPower()
+    local db, cfg, p = ns.db, ns.db.power, self.power
+    p:SetHeight(cfg.height)
+    p:SetTexture(db.texture)
+    p.bar:ClearAllPoints()
+    p.bar:SetWidth(math.max(10, db.width * cfg.width / 100))
+    local hp = self.gauge.bar
+    if cfg.align == "right" then
+        p.bar:SetPoint("TOPRIGHT", hp, "BOTTOMRIGHT", cfg.x, -cfg.gap)
+    elseif cfg.align == "center" then
+        p.bar:SetPoint("TOP", hp, "BOTTOM", cfg.x, -cfg.gap)
+    else
+        p.bar:SetPoint("TOPLEFT", hp, "BOTTOMLEFT", cfg.x, -cfg.gap)
+    end
+    ns.Media:SetFont(p.text, db.text.font, cfg.textSize, db.text.outline)
+    p.text:ClearAllPoints()
+    p.text:SetPoint("TOPRIGHT", p.bar, "BOTTOMRIGHT", -1, -2)
+end
+
+-- The name of your target's target, after its class icon when that's shown.
+function Target:PlaceToTName()
+    local tot, db = self.tot, ns.db
+    local icon = tot.classIcon
+    tot.name:ClearAllPoints()
+    if tot.iconShown then
+        local size = db.icons.classSize
+        icon:SetSize(size, size)
+        icon:ClearAllPoints()
+        icon:SetPoint("BOTTOMLEFT", tot.gauge.bar, "TOPLEFT", 0, 3)
+        tot.name:SetPoint("LEFT", icon, "RIGHT", 3, 0)
+        tot.name:SetWidth(math.max(20, db.tot.width - size - 3))
+    else
+        tot.name:SetPoint("BOTTOMLEFT", tot.gauge.bar, "TOPLEFT", 1, 4)
+        tot.name:SetWidth(db.tot.width)
+    end
+end
+
 function Target:Apply()
     local db, t = ns.db, ns.db.text
     local f = self.frame
@@ -380,13 +367,15 @@ function Target:Apply()
     f:EnableMouse(not db.locked)
     f.unlockTint:SetShown(not db.locked)
     -- Combo points are drawn on Blizzard's target frame, so they stay.
-    ns.HideBlizzardFrame("TargetFrame", db.hideTargetFrame, { "ComboFrame" })
+    FrogLib.Hider.Set(ADDON, "TargetFrame", db.hideTargetFrame, { keep = { "ComboFrame" } })
 
     self.gauge:SetHeight(db.height)
     self.gauge:SetTexture(db.texture)
     ns.Media:SetFont(self.left, t.font, t.size, t.outline)
     ns.Media:SetFont(self.right, t.font, t.size, t.outline)
     self.left:SetWidth(db.width * 0.72) -- long names truncate before reaching the right text
+
+    self:ApplyPower()
 
     local c = self.cast
     c:ClearAllPoints()
@@ -405,13 +394,13 @@ function Target:Apply()
     tot.gauge.bar:ClearAllPoints()
     tot.gauge.bar:SetPoint("BOTTOMLEFT", self.gauge.bar, "BOTTOMRIGHT", db.tot.gap, 0)
     tot.gauge.bar:SetWidth(db.tot.width)
-    tot.name:SetWidth(db.tot.width)
+    self:PlaceToTName()
     ns.Media:SetFont(tot.name, t.font, t.size - 1, t.outline)
     ns.Media:SetFont(self.chevrons, t.font, math.max(8, t.size - 3), t.outline)
     self.chevrons:ClearAllPoints()
     self.chevrons:SetPoint("CENTER", self.gauge.bar, "RIGHT", db.tot.gap / 2, 0)
 
-    ns.Auras:Apply(f, self.gauge.bar)
+    ns.Auras:Apply(f, self.gauge.bar, 6 + self:PowerDrop())
     self:SetupClicks()
     self:Update(true)
     -- A font file is loaded on first use, and text set in that same moment can render blank;
@@ -450,11 +439,82 @@ function Target:Update(instant)
     TintText(self.left, r, g, b)
     TintText(self.right, r, g, b)
     self:UpdateIcons(unit)
+    self:UpdatePower(instant)
 
     if instant then
         self:UpdateCast()
         self:UpdateToT()
     end
+end
+
+-- The texts above the bar again when the power changes, if they show any of it.
+function Target:UpdatePowerWords()
+    if not UnitExists("target") then return end
+    for _, key in ipairs({ "left", "right" }) do
+        local template = ns.db.text[key]
+        if FrogLib.Unit.UsesPower(template) then
+            ns.SetUnitText(self[key], template, "target")
+        end
+    end
+end
+
+-- An empty power gauge fades out (power.hideEmpty): a unit that's generated nothing and spent
+-- nothing has no use for it. When the power can be read, a new target at 0 has it gone at
+-- once, and one that drops to 0 keeps it for EMPTY_WAIT seconds first (rage ebbing between
+-- swings). In combat the power can be secret, so a curve over its percent becomes the gauge's
+-- opacity instead, engine-side: 0 when empty, 1 otherwise.
+local EMPTY_WAIT = 3
+
+function Target:EmptyAlpha(unit, instant)
+    if not (unit and ns.db.power.hideEmpty) then return 1 end
+    local power = UnitPower(unit)
+    if not issecret(power) then
+        if power > 0 then
+            self.emptySince = nil
+            return 1
+        end
+        local now = GetTime()
+        if instant then self.emptySince = now - EMPTY_WAIT end
+        self.emptySince = self.emptySince or now
+        local left = EMPTY_WAIT - (now - self.emptySince)
+        if left <= 0 then return 0 end
+        if not self.emptyTimer then
+            self.emptyTimer = true
+            C_Timer.After(left + 0.05, function()
+                self.emptyTimer = nil
+                self:UpdatePower(false)
+            end)
+        end
+        return 1
+    end
+    local a = Curve.Power(unit, Curve.Empty())
+    if issecret(a) or a ~= nil then return a end
+    return 1
+end
+
+-- Values may be secret: they only go into the gauge and SetFormattedText. A unit with no power
+-- at all (a critter) shows none, when that much can be told. Unlocked with no target: a sample.
+function Target:UpdatePower(instant)
+    local p, cfg = self.power, ns.db.power
+    local unit = UnitExists("target") and "target" or nil
+    local show = cfg.enabled and (unit ~= nil or not ns.db.locked)
+    if show and unit then
+        local max = UnitPowerMax(unit)
+        if Safe(max) == 0 then
+            show = false
+        else
+            p:SetValues(UnitPower(unit), max, instant)
+        end
+    elseif show then
+        p:SetValues(FAKE.power, FAKE.powermax, true)
+    end
+    p.bar:SetShown(show)
+    if not show then return end
+    p.bar:SetAlpha(self:EmptyAlpha(unit, instant))
+    local r, g, b = Color.Power(unit)
+    p:SetColor(r, g, b)
+    ns.SetUnitText(p.text, cfg.text, unit, not unit and FAKE or nil, true)
+    TintText(p.text, r, g, b)
 end
 
 -- Where the icon row starts, and which way it grows:
@@ -473,17 +533,18 @@ function Target:UpdateIcons(unit)
     local prev
     for _, key in ipairs(ICON_ORDER) do
         local tex = self.icons[key]
+        local size = key == "class" and cfg.classSize or cfg.size
         local shown = false
         if cfg.enabled and cfg[key] then
             if unit then
-                shown = SHOW[key](tex, unit, cfg.size)
-            elseif PREVIEW[key] then
-                shown = PREVIEW[key](tex, cfg.size)
+                shown = Icons.SHOW[key](tex, unit, size)
+            elseif Icons.PREVIEW[key] then
+                shown = Icons.PREVIEW[key](tex, size)
             end
         end
         tex:SetShown(shown)
         if shown then
-            if tex:GetObjectType() == "Texture" then tex:SetSize(cfg.size, cfg.size) end
+            if tex:GetObjectType() == "Texture" then tex:SetSize(size, size) end
             tex:ClearAllPoints()
             if prev then
                 if a[6] < 0 then
@@ -505,56 +566,8 @@ function Target:UpdateCast(event)
         c:Hide()
         return
     end
-    if not UnitExists("target") then
-        -- Unlocked preview: show a sample cast so its position can be judged.
-        if not ns.db.locked then
-            c:SetMinMaxValues(0, 1)
-            c:SetValue(0.6)
-            c.gauge:SetColor(1, 0.72, 0.3)
-            c.label:SetText("Spell name")
-            c.time:SetText(ns.db.cast.showTime and "1.4" or "")
-            c:Show()
-        else
-            c:Hide()
-        end
-        return
-    end
-
-    local _, text, _, _, _, _, _, notInterruptible = UnitCastingInfo("target")
-    local duration, direction
-    if text then
-        duration, direction = UnitCastingDuration and UnitCastingDuration("target"), ELAPSED
-    else
-        _, text, _, _, _, _, notInterruptible = UnitChannelInfo("target")
-        if text then
-            duration, direction = UnitChannelDuration and UnitChannelDuration("target"), REMAINING
-        end
-    end
-
-    if text and duration then
-        c.holdUntil = nil
-        pcall(c.SetTimerDuration, c, duration, IMMEDIATE, direction)
-        c.label:SetText(text)
-        if not issecret(notInterruptible) and notInterruptible then
-            c.gauge:SetColor(0.6, 0.6, 0.6)
-        else
-            c.gauge:SetColor(1, 0.72, 0.3)
-        end
-        c:Show()
-    elseif (event == "UNIT_SPELLCAST_INTERRUPTED" or event == "UNIT_SPELLCAST_FAILED") and c:IsShown() then
-        -- Hold the bar briefly so an interrupt is visible, as FFXIV does.
-        c:SetMinMaxValues(0, 1)
-        c:SetValue(1)
-        c.gauge:SetColor(0.85, 0.2, 0.15)
-        c.label:SetText(event == "UNIT_SPELLCAST_FAILED" and FAILED or INTERRUPTED)
-        local hold = GetTime() + 0.8
-        c.holdUntil = hold
-        C_Timer.After(0.8, function()
-            if c.holdUntil == hold then c:Hide() end
-        end)
-    elseif not c.holdUntil then
-        c:Hide()
-    end
+    local exists = UnitExists("target")
+    c.driver:Update((issecret(exists) or exists) and "target" or nil, event, not ns.db.locked)
 end
 
 function Target:UpdateToT()
@@ -565,8 +578,15 @@ function Target:UpdateToT()
     elseif not UnitExists("target") then
         show = not ns.db.locked
         if show then
+            -- The sample stands for you: your class.
+            FAKE_TOT.class, FAKE_TOT.classFile = UnitClass("player")
             tot.gauge:SetValues(FAKE_TOT.value, FAKE_TOT.max, true)
-            if ns.db.colorMode == "xiv" then r, g, b = unpack(XIV_FRIEND) else r, g, b = BarColor(nil) end
+            if ns.db.colorMode == "xiv" then
+                local c = Color.XIV.friend
+                r, g, b = c.r, c.g, c.b
+            else
+                r, g, b = BarColor(nil)
+            end
             ns.SetUnitText(tot.name, cfg.template, nil, FAKE_TOT)
         end
     elseif UnitExists("targettarget") then
@@ -579,6 +599,22 @@ function Target:UpdateToT()
         tot.gauge:SetColor(r, g, b)
         TintText(tot.name, r, g, b)
     end
+
+    -- Its class icon, before the name; the name moves over for it.
+    local icons, iconShown = ns.db.icons, false
+    if show and icons.enabled and icons.class and icons.classToT then
+        if UnitExists("target") then
+            iconShown = Icons.SHOW.class(tot.classIcon, "targettarget")
+        else
+            iconShown = Icons.SetClass(tot.classIcon, FAKE_TOT.classFile)
+        end
+    end
+    tot.classIcon:SetShown(iconShown)
+    if iconShown ~= (tot.iconShown or false) then
+        tot.iconShown = iconShown
+        self:PlaceToTName()
+    end
+
     tot:SetShown(show)
     self.chevrons:SetShown(show)
 end

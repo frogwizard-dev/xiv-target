@@ -95,7 +95,12 @@ local function Layout(cfg)
         lineSpacing = cfg.spacing + (cfg.showTimer and 12 or 0) }
 end
 
-local function Build(parent, anchor)
+local function Signature(cfg, top)
+    return cfg.mode .. "|" .. cfg.max .. "|" .. top
+end
+
+-- top: how far below the anchor's bottom edge the icons start.
+local function Build(parent, anchor, top)
     local cfg = ns.db.auras
     if container then
         pcall(container.SetUnit, container, "none")
@@ -109,7 +114,7 @@ local function Build(parent, anchor)
     if not ok then return end
 
     c:SetSize(1, 1)
-    c:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, -6)
+    c:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, -top)
     CallEither(c, "SetFlowLayoutAnchorPoint", "SetAuraLayoutAnchorPoint", "TOPLEFT")
     CallEither(c, "SetFlowLayoutGrowthDirection", "SetAuraLayoutGrowthDirection",
         AnchorUtil.FlowDirection.Right, AnchorUtil.FlowDirection.Down)
@@ -133,13 +138,16 @@ local function Build(parent, anchor)
     c:SetUnit("target")
     c:UpdateAllAuras()
     container = c
-    signature = cfg.mode .. "|" .. cfg.max
+    signature = Signature(cfg, top)
 end
 
-function Auras:Apply(parent, anchor)
+-- top: as in Build (6 below the bar, more under a power gauge). Where the container sits is
+-- part of what it's built with, so moving it means building it again.
+function Auras:Apply(parent, anchor, top)
     local cfg = ns.db.auras
-    if not container or signature ~= (cfg.mode .. "|" .. cfg.max) then
-        Build(parent, anchor)
+    top = top or 6
+    if not container or signature ~= Signature(cfg, top) then
+        Build(parent, anchor, top)
     end
     if not container then return end
     local layout = Layout(cfg)

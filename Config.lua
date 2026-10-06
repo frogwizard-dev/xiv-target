@@ -45,6 +45,7 @@ local function Stepper(parent, text, min, max, step, get, set, fmt)
     plus:SetPoint("LEFT", val, "RIGHT", 4, 0)
     local function refresh() val:SetText(fmt and string.format(fmt, get()) or get()) end
     local function change(d)
+        if IsShiftKeyDown() then d = d * 10 end -- shift-click: ten steps at once
         local v = math.max(min, math.min(max, get() + d))
         set(math.floor(v / step + 0.5) * step)
         refresh()
@@ -96,6 +97,10 @@ local AURA_MODES = Options("mine", "Only my debuffs", "all", "My debuffs, others
 local ICON_ANCHORS = Options("left", "Left of the name", "right", "Past the end of the bar", "above", "Above the name")
 local COLOR_MODES = Options("xiv", "FFXIV (engaged / passive / friendly)",
     "reaction", "Hostile / neutral / friendly", "fixed", "Always the bar colour")
+local POWER_ALIGN = Options("left", "Under the left end", "center", "Centred", "right", "Under the right end")
+
+-- The template words, in the help under each text box.
+local function W_(word) return "|cffffd100" .. word .. "|r" end
 
 local function ColorSwatch(parent, text, get, set)
     local f = CreateFrame("Frame", nil, parent)
@@ -197,17 +202,51 @@ function Config:BuildText(p)
     local place = Placer()
     place(TextBox(p, "Above bar, left", function() return t.left end, function(v) t.left = v end), 28)
     place(TextBox(p, "Above bar, right", function() return t.right end, function(v) t.right = v end), 30)
-    local help = Label(p, "Words: |cffffd100level|r, |cffffd100name|r, |cffffd100value|r, |cffffd100max|r, "
-        .. "|cffffd100percent|r (|cffffd100percent.1|r for a decimal). Leave empty to hide.", "GameFontDisableSmall")
+    local help = Label(p, "Words: " .. W_("level") .. ", " .. W_("name") .. ", " .. W_("class") .. ", "
+        .. W_("value") .. ", " .. W_("max") .. ", " .. W_("percent") .. " (" .. W_("percent.1")
+        .. " for a decimal); for mana, rage or energy: " .. W_("power") .. ", " .. W_("powermax") .. ", "
+        .. W_("powerpercent") .. ", " .. W_("powertype") .. " (its name). "
+        .. W_("class") .. " is a player's class, or a creature's type (Beast, Undead...). "
+        .. "Leave empty to hide.", "GameFontDisableSmall")
     help:SetWidth(W - 40)
     help:SetJustifyH("LEFT")
-    place(help, 36, 4)
+    place(help, 62, 4)
     place(Dropdown(p, "Font", function() return ns.Media:List("font") end,
         function() return t.font end, function(v) t.font = v end), 30)
     place(Dropdown(p, "Font outline", OUTLINES, function() return t.outline end, function(v) t.outline = v end), 30)
     place(Stepper(p, "Text size", 8, 24, 1, function() return t.size end, function(v) t.size = v end), 28)
     place(Checkbox(p, "Tint text to match the bar, like FFXIV",
         function() return t.tinted end, function(v) t.tinted = v end), 28)
+    place(Checkbox(p, "Show a player's class in its class colour",
+        function() return t.classColor end, function(v) t.classColor = v end), 28)
+end
+
+function Config:BuildPower(p)
+    local cfg = ns.db.power
+    local place = Placer()
+    place(Checkbox(p, "Show the target's power (mana, rage, energy) under the bar",
+        function() return cfg.enabled end, function(v) cfg.enabled = v end), 28)
+    place(Checkbox(p, "Hide it while it's empty (an enemy that hasn't built any rage)",
+        function() return cfg.hideEmpty end, function(v) cfg.hideEmpty = v end), 34)
+    place(Stepper(p, "Height", 1, 12, 1, function() return cfg.height end, function(v) cfg.height = v end), 26)
+    place(Stepper(p, "Length (% of the bar)", 10, 100, 5, function() return cfg.width end,
+        function(v) cfg.width = v end, "%d%%"), 26)
+    place(Dropdown(p, "Lined up", POWER_ALIGN, function() return cfg.align end, function(v) cfg.align = v end), 30)
+    place(Stepper(p, "Gap below the bar", 0, 40, 1, function() return cfg.gap end, function(v) cfg.gap = v end), 26)
+    place(Stepper(p, "Move left / right", -300, 300, 2, function() return cfg.x end, function(v) cfg.x = v end), 26)
+    local help = Label(p, "Shift-click + or - for ten steps at once. Unlock the bar (Bar page) to see a sample.",
+        "GameFontDisableSmall")
+    help:SetWidth(W - 40)
+    help:SetJustifyH("LEFT")
+    place(help, 32, 4)
+    place(TextBox(p, "Text under it", function() return cfg.text end, function(v) cfg.text = v end), 30)
+    local words = Label(p, "Words: " .. W_("value") .. ", " .. W_("max") .. ", " .. W_("percent")
+        .. " (the power's here), " .. W_("powertype") .. ", " .. W_("name") .. ", " .. W_("level") .. ", "
+        .. W_("class") .. ". Leave empty to hide.", "GameFontDisableSmall")
+    words:SetWidth(W - 40)
+    words:SetJustifyH("LEFT")
+    place(words, 34, 4)
+    place(Stepper(p, "Text size", 6, 20, 1, function() return cfg.textSize end, function(v) cfg.textSize = v end), 28)
 end
 
 function Config:BuildToT(p)
@@ -218,6 +257,11 @@ function Config:BuildToT(p)
     place(Stepper(p, "Width", 60, 400, 10, function() return cfg.width end, function(v) cfg.width = v end), 26)
     place(Stepper(p, "Gap from target bar", 0, 80, 2, function() return cfg.gap end, function(v) cfg.gap = v end), 32)
     place(TextBox(p, "Text", function() return cfg.template end, function(v) cfg.template = v end), 28)
+    local help = Label(p, "The same words as on the Text page. Its class icon is on the Icons page.",
+        "GameFontDisableSmall")
+    help:SetWidth(W - 40)
+    help:SetJustifyH("LEFT")
+    place(help, 24, 4)
 end
 
 function Config:BuildAuras(p)
@@ -247,6 +291,7 @@ function Config:BuildIcons(p)
     local help = Label(p, "Unlock the bar (Bar page) to see sample icons while you place them.", "GameFontDisableSmall")
     place(help, 24, 4)
     for _, def in ipairs({
+        { "class", "Class (players)" },
         { "raid", "Raid marker" },
         { "leader", "Group leader / assistant" },
         { "role", "Group role (tank, healer, damage)" },
@@ -256,6 +301,11 @@ function Config:BuildIcons(p)
         local key = def[1]
         place(Checkbox(p, def[2], function() return cfg[key] end, function(v) cfg[key] = v end), 28, 16)
     end
+    place(Label(p, "Class icon"), 22)
+    place(Checkbox(p, "Also before your target's target's name",
+        function() return cfg.classToT end, function(v) cfg.classToT = v end), 28, 16)
+    place(Stepper(p, "Class icon size", 10, 40, 2, function() return cfg.classSize end,
+        function(v) cfg.classSize = v end), 26, 16)
 end
 
 function Config:Build()
@@ -280,10 +330,11 @@ function Config:Build()
             if k == key then tab:LockHighlight() else tab:UnlockHighlight() end
         end
     end
-    for i, def in ipairs({ { "bar", "Bar" }, { "text", "Text" }, { "tot", "ToT" }, { "auras", "Status" }, { "icons", "Icons" } }) do
+    for i, def in ipairs({ { "bar", "Bar" }, { "text", "Text" }, { "power", "Power" }, { "tot", "ToT" },
+        { "auras", "Status" }, { "icons", "Icons" } }) do
         local key = def[1]
-        local tab = Button(f, def[2], 80)
-        tab:SetPoint("TOPLEFT", 14 + (i - 1) * 83, -30)
+        local tab = Button(f, def[2], 66)
+        tab:SetPoint("TOPLEFT", 14 + (i - 1) * 69, -30)
         tab:SetScript("OnClick", function() select(key) end)
         tabs[key] = tab
         local page = CreateFrame("Frame", nil, f)
@@ -293,6 +344,7 @@ function Config:Build()
     end
     self:BuildBar(pages.bar)
     self:BuildText(pages.text)
+    self:BuildPower(pages.power)
     self:BuildToT(pages.tot)
     self:BuildAuras(pages.auras)
     self:BuildIcons(pages.icons)

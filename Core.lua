@@ -33,6 +33,9 @@ ns.defaults = {
         enabled = false, height = 2, width = 100, align = "left", gap = 6, x = 0,
         hideEmpty = true, text = "value", textSize = 10,
     },
+    -- Your combo points on the target (rogues; druids in cat form): a row of small gauges under
+    -- the bar (and its power gauge). gap: from what's above; spacing: between the pips.
+    combo = { enabled = true, hideEmpty = true, height = 3, spacing = 5, gap = 6, color = { r = 1, g = 0.82, b = 0.3 } },
     clicks = true, -- left-click the bars to target, right-click for the unit menu
     hideTargetFrame = false, -- hide Blizzard's target frame (its combo points stay)
     absorb = true, -- the target's shields drawn on its gauge as a striped fill
@@ -56,20 +59,9 @@ ns.defaults = {
 
 ns.issecret = FrogLib.issecret
 
-function ns.Print(...)
-    print("|cfff5dc8fXIVTarget|r:", ...)
-end
+ns.Print = FrogLib.Util.Printer("XIVTarget", "f5dc8f")
 
-local function CopyDefaults(src, dst)
-    for k, v in pairs(src) do
-        if type(v) == "table" then
-            if type(dst[k]) ~= "table" then dst[k] = {} end
-            CopyDefaults(v, dst[k])
-        elseif dst[k] == nil then
-            dst[k] = v
-        end
-    end
-end
+local CopyDefaults = FrogLib.Util.CopyDefaults
 
 -- Text templates and their words (level, name, class, value, max, percent, power, powermax,
 -- powerpercent, powertype): FrogLib.Text and FrogLib.Unit, shared with FrogTarget and FrogFrames.

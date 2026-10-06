@@ -13,29 +13,7 @@ local SORT_DIR = AuraContainerSortDirection and AuraContainerSortDirection.Norma
 local container, signature, keys
 local styled = {}
 
-local formatter
-local function DurationFormatter()
-    if formatter ~= nil then return formatter or nil end
-    formatter = false
-    local R = Enum.NumericRuleFormatRounding
-    if C_StringUtil and C_StringUtil.CreateNumericRuleFormatter and R then
-        local f = C_StringUtil.CreateNumericRuleFormatter()
-        if pcall(f.SetBreakpoints, f, {
-            { threshold = 0, format = "%d", step = 1, rounding = R.Up },
-            { threshold = 60, format = "%dm", step = 1, rounding = R.Up, components = { { div = 60 } } },
-            { threshold = 61, format = "%dm", step = 1, rounding = R.Down, components = { { div = 60 } } },
-            { threshold = 3600, format = "%dh", step = 1, rounding = R.Down, components = { { div = 3600 } } },
-        }) then
-            formatter = f
-        end
-    end
-    return formatter or nil
-end
-
-local function CallEither(c, newName, oldName, ...)
-    local f = c[newName] or c[oldName]
-    if f then pcall(f, c, ...) end
-end
+local A = FrogLib.Auras -- the rows' building blocks (FrogLib's Auras.lua)
 
 local function StyleButton(d)
     local cfg, t = ns.db.auras, ns.db.text
@@ -50,41 +28,8 @@ end
 
 local function MakeInit(harmful)
     return function(button)
-        local d = { button = button }
-        d.border = button:CreateTexture(nil, "BACKGROUND")
-        d.border:SetAllPoints()
-        if harmful then
-            d.border:SetColorTexture(0.75, 0.12, 0.08, 1)
-        else
-            d.border:SetColorTexture(0, 0, 0, 1)
-        end
-        d.icon = button:CreateTexture(nil, "ARTWORK")
-        d.icon:SetPoint("TOPLEFT", 1, -1)
-        d.icon:SetPoint("BOTTOMRIGHT", -1, 1)
-        d.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-        d.cooldown = CreateFrame("Cooldown", nil, button, "CooldownFrameTemplate")
-        d.cooldown:SetAllPoints(d.icon)
-        d.cooldown:SetDrawEdge(false)
-        d.cooldown:SetReverse(true)
-        d.cooldown:SetHideCountdownNumbers(true)
-        local carrier = CreateFrame("Frame", nil, button)
-        carrier:SetAllPoints()
-        carrier:SetFrameLevel(d.cooldown:GetFrameLevel() + 1)
-        carrier:EnableMouse(false)
-        d.stack = carrier:CreateFontString(nil, "OVERLAY")
-        d.stack:SetPoint("BOTTOMRIGHT", -1, 1)
         -- FFXIV prints the timer under the icon rather than on it.
-        d.duration = carrier:CreateFontString(nil, "OVERLAY")
-        d.duration:SetPoint("TOP", button, "BOTTOM", 0, -1)
-        StyleButton(d)
-
-        pcall(button.SetMouseClickEnabled, button, false)
-        button:SetIcon(d.icon)
-        button:SetDurationCooldown(d.cooldown)
-        button:SetApplicationCount(d.stack, {})
-        if not pcall(button.SetDurationText, button, d.duration, { textFormatter = DurationFormatter() }) then
-            pcall(button.SetDurationText, button, d.duration, {})
-        end
+        local d = A.InitButton(button, { border = harmful and { 0.75, 0.12, 0.08 } or nil, style = StyleButton })
         table.insert(styled, d)
     end
 end
@@ -102,22 +47,13 @@ end
 -- top: how far below the anchor's bottom edge the icons start.
 local function Build(parent, anchor, top)
     local cfg = ns.db.auras
-    if container then
-        pcall(container.SetUnit, container, "none")
-        container:Hide()
-        container = nil
-    end
-    if not C_AddOns.IsAddOnLoaded("Blizzard_AuraContainer") then
-        C_AddOns.LoadAddOn("Blizzard_AuraContainer")
-    end
-    local ok, c = pcall(CreateFrame, "AuraContainer", nil, parent, "CustomAuraContainerTemplate")
-    if not ok then return end
+    A.Release(container)
+    container = nil
+    local c = A.NewContainer(parent)
+    if not c then return end
 
-    c:SetSize(1, 1)
     c:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, -top)
-    CallEither(c, "SetFlowLayoutAnchorPoint", "SetAuraLayoutAnchorPoint", "TOPLEFT")
-    CallEither(c, "SetFlowLayoutGrowthDirection", "SetAuraLayoutGrowthDirection",
-        AnchorUtil.FlowDirection.Right, AnchorUtil.FlowDirection.Down)
+    A.Flow(c, "TOPLEFT", "RIGHT", "DOWN")
 
     wipe(styled)
     keys = {}
@@ -154,7 +90,7 @@ function Auras:Apply(parent, anchor, top)
     for _, key in ipairs(keys) do
         pcall(container.SetAuraGroupLayout, container, key, layout)
     end
-    CallEither(container, "SetFlowLayoutMaximumLineSize", "SetAuraLayoutRowWidth", ns.db.width + 0.4)
+    A.SetLineSize(container, ns.db.width + 0.4)
     container:SetShown(cfg.enabled)
     for _, d in ipairs(styled) do pcall(StyleButton, d) end
 end

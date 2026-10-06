@@ -76,21 +76,11 @@ function Target:Init()
     f:SetHeight(26)
     f:SetClampedToScreen(true)
     f:SetMovable(true)
-    f:RegisterForDrag("LeftButton")
-    f:SetScript("OnDragStart", f.StartMoving)
-    f:SetScript("OnDragStop", function(frame)
-        frame:StopMovingOrSizing()
-        local p, _, rp, x, y = frame:GetPoint()
-        ns.db.point = { p, "UIParent", rp, x, y }
-    end)
-    -- Tint shown only while unlocked, marking the draggable area.
-    f.unlockTint = f:CreateTexture(nil, "BACKGROUND")
-    f.unlockTint:SetPoint("TOPLEFT", -4, 4)
-    f.unlockTint:SetPoint("BOTTOMRIGHT", 4, -4)
-    f.unlockTint:SetColorTexture(0.3, 0.6, 1, 0.2)
+    -- Dragged while unlocked; the tint, shown only then, marks it (FrogLib's Mover.lua).
+    FrogLib.Mover.Make(f, { save = function(point) ns.db.point = point end, tint = 4 })
     self.frame = f
 
-    local g = ns.CreateGauge(f)
+    local g = FrogLib.Gauge.New(f)
     g.bar:SetPoint("BOTTOMLEFT")
     g.bar:SetPoint("BOTTOMRIGHT")
     g:EnableAbsorb()
@@ -105,6 +95,7 @@ function Target:Init()
     self.left:SetWordWrap(false)
 
     self:BuildPower()
+    self:BuildCombo()
     self:BuildCast()
     self:BuildToT()
     self.icons = {}
@@ -164,17 +155,28 @@ end
 -- under its right end (as FFXIV prints a party member's MP). The text is on the gauge, so it
 -- fades out with it (power.hideEmpty).
 function Target:BuildPower()
-    local p = ns.CreateGauge(self.frame)
+    local p = FrogLib.Gauge.New(self.frame)
     p.text = Text(p.bar)
     p.text:SetJustifyH("RIGHT")
     p.bar:Hide()
     self.power = p
 end
 
+-- Your combo points: a row of small gauges, from FrogLib's Combo.lua (only for a character that
+-- has them).
+function Target:BuildCombo()
+    if not FrogLib.Combo.Has() then return end
+    self.combo = FrogLib.Combo.NewRow(self.frame, function(_, holder)
+        local g = FrogLib.Gauge.New(holder)
+        return g, g.bar
+    end)
+    FrogLib.Combo.Watch(function() self:UpdateCombo() end, function() self:ApplyCombo() end)
+end
+
 -- FFXIV shows an enemy's cast as a glowing white-gold line floating over the right half of
 -- the bar, with the spell name hanging underneath it.
 function Target:BuildCast()
-    local g = ns.CreateGauge(self.frame)
+    local g = FrogLib.Gauge.New(self.frame)
     g:SetColor(1, 0.72, 0.30)
     local c = g.bar
     c.gauge = g
@@ -237,7 +239,7 @@ function Target:BuildToT()
     self.chevrons:SetTextColor(0.96, 0.86, 0.56, 0.8)
 
     local t = CreateFrame("Frame", nil, self.frame)
-    t.gauge = ns.CreateGauge(t)
+    t.gauge = FrogLib.Gauge.New(t)
     t.name = Text(t)
     t.name:SetPoint("BOTTOMLEFT", t.gauge.bar, "TOPLEFT", 1, 4)
     t.name:SetJustifyH("LEFT")
@@ -320,6 +322,39 @@ function Target:PowerDrop()
     return drop
 end
 
+-- How far the combo points reach below what's over them (nothing for a character without them;
+-- kept out of cat form too, so the status effects don't jump with every shift).
+function Target:ComboDrop()
+    local cfg = ns.db.combo
+    if not (self.combo and cfg.enabled) then return 0 end
+    return cfg.gap + cfg.height
+end
+
+function Target:ApplyCombo()
+    local row, db = self.combo, ns.db
+    if not row then return end
+    local cfg = db.combo
+    if not (cfg.enabled and row:Refresh(not db.locked)) then
+        row.holder:Hide()
+        return
+    end
+    local c = cfg.color
+    row:Layout(db.width, cfg.height, cfg.spacing, function(g, w, h)
+        g:SetHeight(h)
+        g:SetTexture(db.texture)
+        g.bar:SetWidth(w)
+        g:SetColor(c.r, c.g, c.b)
+    end)
+    row.holder:ClearAllPoints()
+    row.holder:SetPoint("TOPLEFT", self.gauge.bar, "BOTTOMLEFT", 0, -(self:PowerDrop() + cfg.gap))
+    self:UpdateCombo()
+end
+
+-- The count (a sample while unlocked); it may be secret, so it only goes into the gauges.
+function Target:UpdateCombo()
+    if self.combo then self.combo:Update(not ns.db.locked, ns.db.combo.hideEmpty) end
+end
+
 function Target:ApplyPower()
     local db, cfg, p = ns.db, ns.db.power, self.power
     p:SetHeight(cfg.height)
@@ -400,7 +435,8 @@ function Target:Apply()
     self.chevrons:ClearAllPoints()
     self.chevrons:SetPoint("CENTER", self.gauge.bar, "RIGHT", db.tot.gap / 2, 0)
 
-    ns.Auras:Apply(f, self.gauge.bar, 6 + self:PowerDrop())
+    self:ApplyCombo()
+    ns.Auras:Apply(f, self.gauge.bar, 6 + self:PowerDrop() + self:ComboDrop())
     self:SetupClicks()
     self:Update(true)
     -- A font file is loaded on first use, and text set in that same moment can render blank;

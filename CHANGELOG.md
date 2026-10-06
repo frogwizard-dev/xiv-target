@@ -1,5 +1,11 @@
 # XIVTarget
 
+## 0.5.1
+
+- Settings: a dropdown shows the current choice afresh whenever its page opens. The settings controls and window now come from FrogLib, shared with Frog Wizard's other add-ons.
+- Where you drag it is now kept only in its own settings, not also in the game's layout file, so the two can't disagree about where it goes.
+- New: your **combo points** under the target bar, as a row of small gauges (rogues, and druids in cat form), hidden until you have one. Its height, spacing and colour are on the Power page, and it shows a sample while unlocked.
+
 ## 0.5.0
 
 ### Class

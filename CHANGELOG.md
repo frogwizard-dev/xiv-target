@@ -1,5 +1,9 @@
 # XIVTarget
 
+## 0.5.2
+
+- Font outline: a new "Drop shadow" choice, no outline but a soft black shadow under the text (FrogLib's).
+
 ## 0.5.1
 
 - Settings: a dropdown shows the current choice afresh whenever its page opens. The settings controls and window now come from FrogLib, shared with Frog Wizard's other add-ons.

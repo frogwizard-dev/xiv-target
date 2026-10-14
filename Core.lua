@@ -34,8 +34,10 @@ ns.defaults = {
         hideEmpty = true, text = "value", textSize = 10,
     },
     -- Your combo points on the target (rogues; druids in cat form): a row of small gauges under
-    -- the bar (and its power gauge). gap: from what's above; spacing: between the pips.
-    combo = { enabled = true, hideEmpty = true, height = 3, spacing = 5, gap = 6, color = { r = 1, g = 0.82, b = 0.3 } },
+    -- the bar, right under it (first, the power gauge then under them) or under its power gauge.
+    -- gap: from what's above; spacing: between the pips.
+    combo = { enabled = true, hideEmpty = true, height = 3, spacing = 5, gap = 6, first = true,
+        color = { r = 1, g = 0.82, b = 0.3 } },
     clicks = true, -- left-click the bars to target, right-click for the unit menu
     hideTargetFrame = false, -- hide Blizzard's target frame (its combo points stay)
     absorb = true, -- the target's shields drawn on its gauge as a striped fill

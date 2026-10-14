@@ -346,7 +346,10 @@ function Target:ApplyCombo()
         g:SetColor(c.r, c.g, c.b)
     end)
     row.holder:ClearAllPoints()
-    row.holder:SetPoint("TOPLEFT", self.gauge.bar, "BOTTOMLEFT", 0, -(self:PowerDrop() + cfg.gap))
+    -- Right under the bar (first), or under its power gauge (which keeps its room whether the
+    -- target has power or not, so nothing jumps between targets).
+    local down = cfg.first and cfg.gap or (self:PowerDrop() + cfg.gap)
+    row.holder:SetPoint("TOPLEFT", self.gauge.bar, "BOTTOMLEFT", 0, -down)
     self:UpdateCombo()
 end
 
@@ -362,12 +365,14 @@ function Target:ApplyPower()
     p.bar:ClearAllPoints()
     p.bar:SetWidth(math.max(10, db.width * cfg.width / 100))
     local hp = self.gauge.bar
+    -- Under the combo points when they come first (combo.first).
+    local down = cfg.gap + (db.combo.first and self:ComboDrop() or 0)
     if cfg.align == "right" then
-        p.bar:SetPoint("TOPRIGHT", hp, "BOTTOMRIGHT", cfg.x, -cfg.gap)
+        p.bar:SetPoint("TOPRIGHT", hp, "BOTTOMRIGHT", cfg.x, -down)
     elseif cfg.align == "center" then
-        p.bar:SetPoint("TOP", hp, "BOTTOM", cfg.x, -cfg.gap)
+        p.bar:SetPoint("TOP", hp, "BOTTOM", cfg.x, -down)
     else
-        p.bar:SetPoint("TOPLEFT", hp, "BOTTOMLEFT", cfg.x, -cfg.gap)
+        p.bar:SetPoint("TOPLEFT", hp, "BOTTOMLEFT", cfg.x, -down)
     end
     ns.Media:SetFont(p.text, db.text.font, cfg.textSize, db.text.outline)
     p.text:ClearAllPoints()

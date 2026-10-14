@@ -1,5 +1,9 @@
 # XIVTarget
 
+## 0.5.3
+
+- Combo points right under the bar now, with the target's power gauge under them, so they sit close to its health whether the target has power or not (most enemies don't, and the room kept for it left a gap). "Right under the bar" on the combo points' settings; untick it for the old order.
+
 ## 0.5.2
 
 - Font outline: a new "Drop shadow" choice, no outline but a soft black shadow under the text (FrogLib's).

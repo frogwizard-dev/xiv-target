@@ -115,6 +115,8 @@ function Config:BuildPower(p)
     place(Stepper(p, "Height", 1, 12, 1, function() return combo.height end, function(v) combo.height = v end), 26)
     place(Stepper(p, "Gap between them", 0, 20, 1, function() return combo.spacing end,
         function(v) combo.spacing = v end), 26)
+    place(Checkbox(p, "Right under the bar (the power gauge under them)", function() return combo.first end,
+        function(v) combo.first = v end), 26)
     place(Stepper(p, "Gap below the bar", 0, 40, 1, function() return combo.gap end, function(v) combo.gap = v end), 26)
     place(ColorSwatch(p, "Colour", function() return combo.color end,
         function(r, g, b) combo.color = { r = r, g = g, b = b } end), 28)

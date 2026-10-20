@@ -1,5 +1,16 @@
 # XIVTarget
 
+## 0.6.0
+
+### A bar for your focus
+- New **Focus** page: a smaller bar for your focus in the target bar's look (its texture, font, colouring and text tint): a thin gauge with a text over each end (the target bar's words: level, name, class, value, percent...), the focus's raid mark before the name, and its casts as a thinner line underneath, the spell's name under its right end and the time left under its left.
+- Its own place (drag it while unlocked; a sample shows with no focus), scale, width, bar height and text size. Click it to target your focus, right-click for its menu.
+- Blizzard's focus frame is hidden while it's on (can be turned off). On to start with; it only shows while you have a focus.
+- The settings window is a little wider to fit the new tab.
+
+### Fixes
+- Combo points no longer show twice: with Blizzard's target frame hidden and XIVTarget's own combo points on, Blizzard's combo points go with its frame (they used to stay, and stayed even when another addon, FrogFrames say, hid them).
+
 ## 0.5.3
 
 - Combo points right under the bar now, with the target's power gauge under them, so they sit close to its health whether the target has power or not (most enemies don't, and the room kept for it left a gap). "Right under the bar" on the combo points' settings; untick it for the old order.

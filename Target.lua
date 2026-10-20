@@ -40,6 +40,7 @@ local function BarColor(unit)
     end
     return db.color.r, db.color.g, db.color.b
 end
+ns.BarColor = BarColor -- the focus bar's too (Focus.lua)
 
 -- Text in a light version of the bar's colour, with a dark outline so it lifts off the world.
 local function TintText(fs, r, g, b)
@@ -49,6 +50,7 @@ local function TintText(fs, r, g, b)
         fs:SetTextColor(1, 1, 1)
     end
 end
+ns.TintText = TintText
 
 ------------------------------------------------------------------------------
 -- Icons beside the name: class, raid marker, leader/assistant, group role, PvP, quest mob. Each
@@ -406,8 +408,10 @@ function Target:Apply()
     f:SetPoint(db.point[1], UIParent, db.point[3], db.point[4], db.point[5])
     f:EnableMouse(not db.locked)
     f.unlockTint:SetShown(not db.locked)
-    -- Combo points are drawn on Blizzard's target frame, so they stay.
-    FrogLib.Hider.Set(ADDON, "TargetFrame", db.hideTargetFrame, { keep = { "ComboFrame" } })
+    -- Blizzard's combo points (drawn on its target frame) stay, unless ours are on: then they'd
+    -- be shown twice (and another addon hiding them couldn't).
+    local ownCombo = self.combo and db.combo.enabled
+    FrogLib.Hider.Set(ADDON, "TargetFrame", db.hideTargetFrame, { keep = ownCombo and {} or { "ComboFrame" } })
 
     self.gauge:SetHeight(db.height)
     self.gauge:SetTexture(db.texture)

@@ -2,7 +2,7 @@ local _, ns = ...
 local Config = {}
 ns.Config = Config
 
-local W, H = 440, 560
+local W, H = 480, 560
 
 -- The controls are FrogLib's (UI.lua); every change calls ns.Refresh().
 local UI = FrogLib.UI.Kit({ refresh = function() ns.Refresh() end })
@@ -189,7 +189,8 @@ function Config:Build()
         { "tot", "ToT", function(p) self:BuildToT(p) end },
         { "auras", "Status", function(p) self:BuildAuras(p) end },
         { "icons", "Icons", function(p) self:BuildIcons(p) end },
-    }, { tabWidth = 66, tabGap = 3 })
+        { "focus", "Focus", function(p) ns.Focus.BuildPage(p, UI) end },
+    }, { tabWidth = 66, tabGap = 3, fitTabs = true })
 end
 
 function Config:Toggle()

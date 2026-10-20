@@ -80,6 +80,7 @@ end
 
 function ns.Refresh()
     if ns.Target then ns.Target:Apply() end
+    if ns.Focus then ns.Focus:Apply() end
 end
 
 local f = CreateFrame("Frame")
@@ -119,6 +120,7 @@ f:SetScript("OnEvent", function(_, event, arg1)
         ns.db = db
     elseif event == "PLAYER_LOGIN" then
         ns.Target:Init()
+        ns.Focus:Init()
     end
 end)
 

@@ -1,5 +1,9 @@
 # XIVTarget
 
+## 0.6.1
+
+- Options > AddOns with the gamepad interface: the Frog Wizard pages no longer upset the game's gamepad navigation (which could bring up errors on opening the settings). From FrogLib 1.5.0.
+
 ## 0.6.0
 
 ### A bar for your focus

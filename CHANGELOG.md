@@ -1,5 +1,9 @@
 # XIVTarget
 
+## 0.7.0
+
+- New option on the Bar page: **Hide your target's nameplate**, so the target bar is the only bar showing for it (no second bar floating over its head). Works with Blizzard's nameplates and nameplate addons, and in combat. Off to start with.
+
 ## 0.6.1
 
 - Options > AddOns with the gamepad interface: the Frog Wizard pages no longer upset the game's gamepad navigation (which could bring up errors on opening the settings). From FrogLib 1.5.0.

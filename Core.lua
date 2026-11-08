@@ -40,6 +40,7 @@ ns.defaults = {
         color = { r = 1, g = 0.82, b = 0.3 } },
     clicks = true, -- left-click the bars to target, right-click for the unit menu
     hideTargetFrame = false, -- hide Blizzard's target frame (its combo points stay)
+    hideTargetPlate = false, -- fade out the target's nameplate so only the bar shows for it
     absorb = true, -- the target's shields drawn on its gauge as a striped fill
     -- Small icons by the name. anchor: "left" of the name, "right" past the bar's end, or
     -- "above" the name; x/y nudge the whole row from there.
@@ -81,6 +82,7 @@ end
 function ns.Refresh()
     if ns.Target then ns.Target:Apply() end
     if ns.Focus then ns.Focus:Apply() end
+    if ns.UpdateTargetPlate then ns.UpdateTargetPlate() end
 end
 
 local f = CreateFrame("Frame")

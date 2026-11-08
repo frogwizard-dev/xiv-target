@@ -2,7 +2,7 @@
 ## Title: XIVTarget
 ## Category: Frog Wizard
 ## Notes: An FFXIV-style target bar: a thin gauge with the name above, cast and status effects around it, your target's target alongside, and a smaller bar for your focus.
-## Version: 0.6.1
+## Version: 0.7.0
 ## X-Curse-Project-ID: 1719605
 ## OptionalDeps: EllesmereUI
 ## SavedVariables: XIVTargetDB
@@ -15,4 +15,5 @@ Media.lua
 Auras.lua
 Target.lua
 Focus.lua
+Nameplate.lua
 Config.lua

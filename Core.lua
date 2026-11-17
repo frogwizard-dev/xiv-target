@@ -25,17 +25,14 @@ ns.defaults = {
         right = "percent",
     },
     tot = { enabled = true, width = 150, gap = 40, template = "name" },
-    -- The target's power (mana, rage, energy) on a slimmer gauge under the health gauge: `width`
-    -- per cent as long, lined up by `align` ("left", "center", "right"), `gap` pixels below it
-    -- and nudged x pixels sideways. text: a template whose value, max and percent are the
-    -- power's, printed under the gauge's right end; empty hides it.
+    -- The target's power on a slimmer gauge under the health one: `width` per cent as long, lined up by
+    -- `align`, `gap` below, nudged `x` sideways; text: a template (value, max, percent are the power's).
     power = {
         enabled = false, height = 2, width = 100, align = "left", gap = 6, x = 0,
         hideEmpty = true, text = "value", textSize = 10,
     },
-    -- Your combo points on the target (rogues; druids in cat form): a row of small gauges under
-    -- the bar, right under it (first, the power gauge then under them) or under its power gauge.
-    -- gap: from what's above; spacing: between the pips.
+    -- Your combo points (rogues; cat-form druids) as small gauges, right under the bar (first) or under
+    -- the power gauge. gap: from what's above; spacing: between the pips.
     combo = { enabled = true, hideEmpty = true, height = 3, spacing = 5, gap = 6, first = true,
         color = { r = 1, g = 0.82, b = 0.3 } },
     clicks = true, -- left-click the bars to target, right-click for the unit menu
@@ -66,17 +63,23 @@ ns.Print = FrogLib.Util.Printer("XIVTarget", "f5dc8f")
 
 local CopyDefaults = FrogLib.Util.CopyDefaults
 
--- Text templates and their words (level, name, class, value, max, percent, power, powermax,
--- powerpercent, powertype): FrogLib.Text and FrogLib.Unit, shared with FrogTarget and FrogFrames.
--- Values may be secret, so they're only ever formatted engine-side by SetFormattedText.
--- Fills a FontString from a template for a unit. fake = values for the unlocked preview (its
--- class word: class plus classFile, coloured); power = value, max and percent are the unit's
--- power rather than its health (the power gauge's text).
-local textOpts = {}
-function ns.SetUnitText(fs, template, unit, fake, power)
-    textOpts.fake, textOpts.power = fake or nil, power
-    textOpts.classColor = ns.db.text.classColor -- the class word in the class's colour (players)
-    FrogLib.Unit.SetText(fs, template, unit, textOpts)
+-- Fills a FontString from a template (FrogLib.Unit; values may be secret, so only SetFormattedText formats
+-- them). fake: the unlocked preview's values; power: value, max and percent are the unit's power.
+local textOptions = {}
+function ns.SetUnitText(text, template, unit, fake, power)
+    textOptions.fake, textOptions.power = fake or nil, power
+    textOptions.classColor = ns.db.text.classColor -- the class word in the class's colour (players)
+    FrogLib.Unit.SetText(text, template, unit, textOptions)
+end
+
+-- A shadowed font string (FrogLib.Text.Shadowed). With `justify`, it's one line, aligned that way.
+function ns.Text(parent, justify)
+    local text = FrogLib.Text.Shadowed(parent)
+    if justify then
+        text:SetJustifyH(justify)
+        text:SetWordWrap(false)
+    end
+    return text
 end
 
 function ns.Refresh()
@@ -85,11 +88,11 @@ function ns.Refresh()
     if ns.UpdateTargetPlate then ns.UpdateTargetPlate() end
 end
 
-local f = CreateFrame("Frame")
-f:RegisterEvent("ADDON_LOADED")
-f:RegisterEvent("PLAYER_LOGIN")
-f:SetScript("OnEvent", function(_, event, arg1)
-    if event == "ADDON_LOADED" and arg1 == ADDON then
+local events = CreateFrame("Frame")
+events:RegisterEvent("ADDON_LOADED")
+events:RegisterEvent("PLAYER_LOGIN")
+events:SetScript("OnEvent", function(_, event, addonName)
+    if event == "ADDON_LOADED" and addonName == ADDON then
         XIVTargetDB = XIVTargetDB or {}
         local db = XIVTargetDB
         -- 0.1 -> 0.2: thinner FFXIV defaults (only where the old default was never changed),
@@ -123,6 +126,7 @@ f:SetScript("OnEvent", function(_, event, arg1)
     elseif event == "PLAYER_LOGIN" then
         ns.Target:Init()
         ns.Focus:Init()
+        ns.UpdateTargetPlate()
     end
 end)
 

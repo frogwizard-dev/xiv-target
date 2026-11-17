@@ -3,10 +3,10 @@ local Target = {}
 ns.Target = Target
 
 local issecret, Safe = FrogLib.issecret, FrogLib.Safe
--- Reading casts and when the cast bar shows (FrogLib.Cast), the curve an empty power gauge fades
--- by (FrogLib.Curve), the colours (FrogLib.Color), the icons by the name (FrogLib.Icons) and the
--- click buttons (FrogLib.Secure) are shared with Frog Wizard's other bars.
+-- Casts and when the cast bar shows (FrogLib.Cast), the curve an empty power gauge fades by (FrogLib.Curve),
+-- the colours and the icons by the name are shared with Frog Wizard's other bars.
 local Cast, Curve, Color, Icons = FrogLib.Cast, FrogLib.Curve, FrogLib.Color, FrogLib.Icons
+local Text = ns.Text
 
 -- Shown while unlocked with nothing targeted, so there's something to drag and style.
 local MANA_NAME = type(MANA) == "string" and MANA or "Mana"
@@ -43,58 +43,46 @@ end
 ns.BarColor = BarColor -- the focus bar's too (Focus.lua)
 
 -- Text in a light version of the bar's colour, with a dark outline so it lifts off the world.
-local function TintText(fs, r, g, b)
+local function TintText(text, r, g, b)
     if ns.db.text.tinted then
-        fs:SetTextColor(Color.Lighten(r, g, b, 0.55))
+        text:SetTextColor(Color.Lighten(r, g, b, 0.55))
     else
-        fs:SetTextColor(1, 1, 1)
+        text:SetTextColor(1, 1, 1)
     end
 end
 ns.TintText = TintText
 
 ------------------------------------------------------------------------------
--- Icons beside the name: class, raid marker, leader/assistant, group role, PvP, quest mob. Each
--- is FrogLib.Icons' (SHOW for a unit, PREVIEW for the unlocked sample); the raid marker is a
--- FontString, as which mark it is can be secret.
+-- Icons beside the name, each FrogLib.Icons' (SHOW for a unit, PREVIEW for the unlocked sample); the
+-- raid marker is a FontString, as which mark it is can be secret.
 ------------------------------------------------------------------------------
 
 local ICON_ORDER = { "class", "raid", "leader", "role", "pvp", "quest" } -- nearest the name first
-
-local function Text(parent)
-    -- A default font up front: SetText errors on a FontString with none, and the configured
-    -- font is only applied later in Apply.
-    local fs = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    fs:SetShadowOffset(1, -1)
-    fs:SetShadowColor(0, 0, 0, 0.9)
-    return fs
-end
 
 ------------------------------------------------------------------------------
 -- Build
 ------------------------------------------------------------------------------
 
 function Target:Init()
-    local f = CreateFrame("Frame", "XIVTargetFrame", UIParent)
-    f:SetHeight(26)
-    f:SetClampedToScreen(true)
-    f:SetMovable(true)
+    local frame = CreateFrame("Frame", "XIVTargetFrame", UIParent)
+    frame:SetHeight(26)
+    frame:SetClampedToScreen(true)
+    frame:SetMovable(true)
     -- Dragged while unlocked; the tint, shown only then, marks it (FrogLib's Mover.lua).
-    FrogLib.Mover.Make(f, { save = function(point) ns.db.point = point end, tint = 4 })
-    self.frame = f
+    FrogLib.Mover.Make(frame, { save = function(point) ns.db.point = point end, tint = 4 })
+    self.frame = frame
 
-    local g = FrogLib.Gauge.New(f)
-    g.bar:SetPoint("BOTTOMLEFT")
-    g.bar:SetPoint("BOTTOMRIGHT")
-    g:EnableAbsorb()
-    self.gauge = g
+    local gauge = FrogLib.Gauge.New(frame)
+    gauge.bar:SetPoint("BOTTOMLEFT")
+    gauge.bar:SetPoint("BOTTOMRIGHT")
+    gauge:EnableAbsorb()
+    self.gauge = gauge
 
-    self.left = Text(f)
-    self.left:SetPoint("BOTTOMLEFT", g.bar, "TOPLEFT", 1, 2)
-    self.left:SetJustifyH("LEFT")
-    self.right = Text(f)
-    self.right:SetPoint("BOTTOMRIGHT", g.bar, "TOPRIGHT", -1, 2)
+    self.left = Text(frame, "LEFT")
+    self.left:SetPoint("BOTTOMLEFT", gauge.bar, "TOPLEFT", 1, 2)
+    self.right = Text(frame)
+    self.right:SetPoint("BOTTOMRIGHT", gauge.bar, "TOPRIGHT", -1, 2)
     self.right:SetJustifyH("RIGHT")
-    self.left:SetWordWrap(false)
 
     self:BuildPower()
     self:BuildCombo()
@@ -102,36 +90,36 @@ function Target:Init()
     self:BuildToT()
     self.icons = {}
     for _, key in ipairs(ICON_ORDER) do
-        self.icons[key] = key == "raid" and Text(f) or f:CreateTexture(nil, "OVERLAY")
+        self.icons[key] = key == "raid" and Text(frame) or frame:CreateTexture(nil, "OVERLAY")
     end
 
-    f:RegisterEvent("PLAYER_TARGET_CHANGED")
-    f:RegisterEvent("PLAYER_REGEN_ENABLED")
+    frame:RegisterEvent("PLAYER_TARGET_CHANGED")
+    frame:RegisterEvent("PLAYER_REGEN_ENABLED")
     for _, event in ipairs({ "RAID_TARGET_UPDATE", "PARTY_LEADER_CHANGED", "GROUP_ROSTER_UPDATE", "PLAYER_ROLES_ASSIGNED" }) do
-        pcall(f.RegisterEvent, f, event)
+        pcall(frame.RegisterEvent, frame, event)
     end
-    pcall(f.RegisterUnitEvent, f, "UNIT_CLASSIFICATION_CHANGED", "target")
-    f:RegisterUnitEvent("UNIT_HEALTH", "target")
-    f:RegisterUnitEvent("UNIT_MAXHEALTH", "target")
-    f:RegisterUnitEvent("UNIT_ABSORB_AMOUNT_CHANGED", "target")
-    f:RegisterUnitEvent("UNIT_NAME_UPDATE", "target")
-    f:RegisterUnitEvent("UNIT_LEVEL", "target")
-    f:RegisterUnitEvent("UNIT_FACTION", "target")
-    f:RegisterUnitEvent("UNIT_FLAGS", "target") -- entering/leaving combat recolours the bar
+    pcall(frame.RegisterUnitEvent, frame, "UNIT_CLASSIFICATION_CHANGED", "target")
+    frame:RegisterUnitEvent("UNIT_HEALTH", "target")
+    frame:RegisterUnitEvent("UNIT_MAXHEALTH", "target")
+    frame:RegisterUnitEvent("UNIT_ABSORB_AMOUNT_CHANGED", "target")
+    frame:RegisterUnitEvent("UNIT_NAME_UPDATE", "target")
+    frame:RegisterUnitEvent("UNIT_LEVEL", "target")
+    frame:RegisterUnitEvent("UNIT_FACTION", "target")
+    frame:RegisterUnitEvent("UNIT_FLAGS", "target") -- entering/leaving combat recolours the bar
     for event in pairs(POWER_EVENTS) do
-        pcall(f.RegisterUnitEvent, f, event, "target")
+        pcall(frame.RegisterUnitEvent, frame, event, "target")
     end
     for _, event in ipairs(Cast.EVENTS) do
-        pcall(f.RegisterUnitEvent, f, event, "target")
+        pcall(frame.RegisterUnitEvent, frame, event, "target")
     end
-    f:SetScript("OnEvent", function(_, event)
+    frame:SetScript("OnEvent", function(_, event, _, _, _, interruptedBy)
         if event == "PLAYER_TARGET_CHANGED" then
             self:Update(true)
             ns.Auras:TargetChanged()
         elseif event == "PLAYER_REGEN_ENABLED" then
             if self.clicksPending then self:SetupClicks() end
         elseif event:find("^UNIT_SPELLCAST") then
-            self:UpdateCast(event)
+            self:UpdateCast(event, interruptedBy)
         elseif POWER_EVENTS[event] then
             self:UpdatePower(false)
             self:UpdatePowerWords()
@@ -140,28 +128,33 @@ function Target:Init()
         end
     end)
 
-    -- Target of target has no events of its own, so poll it a few times a second.
-    local elapsed = 0
-    f:SetScript("OnUpdate", function(_, dt)
-        elapsed = elapsed + dt
-        if elapsed > 0.2 then
-            elapsed = 0
+    -- Target of target has no events of its own, so poll it a few times a second: a new one (or one that can't be told
+    -- apart, its GUID secret) drawn in full, and the same one in full once a second, only its health between.
+    local elapsed, lastGUID, lastFull = 0, nil, 0
+    frame:SetScript("OnUpdate", function(_, sinceLast)
+        elapsed = elapsed + sinceLast
+        if elapsed <= 0.2 then return end
+        elapsed = 0
+        local guid, now = UnitGUID("targettarget"), GetTime()
+        if issecret(guid) or guid == nil or guid ~= lastGUID or now - lastFull >= 1 or not self.tot:IsShown() then
+            lastGUID, lastFull = not issecret(guid) and guid or nil, now
             self:UpdateToT()
+        else
+            self.tot.gauge:SetValues(UnitHealth("targettarget"), UnitHealthMax("targettarget"))
         end
     end)
 
     self:Apply()
 end
 
--- The power gauge: a slimmer line of the same kind under the health gauge, its number hanging
--- under its right end (as FFXIV prints a party member's MP). The text is on the gauge, so it
--- fades out with it (power.hideEmpty).
+-- The power gauge: a slimmer line under the health gauge, its number under its right end (as FFXIV
+-- prints a party member's MP). The text is on the gauge, so it fades out with it (power.hideEmpty).
 function Target:BuildPower()
-    local p = FrogLib.Gauge.New(self.frame)
-    p.text = Text(p.bar)
-    p.text:SetJustifyH("RIGHT")
-    p.bar:Hide()
-    self.power = p
+    local gauge = FrogLib.Gauge.New(self.frame)
+    gauge.text = Text(gauge.bar)
+    gauge.text:SetJustifyH("RIGHT")
+    gauge.bar:Hide()
+    self.power = gauge
 end
 
 -- Your combo points: a row of small gauges, from FrogLib's Combo.lua (only for a character that
@@ -169,8 +162,8 @@ end
 function Target:BuildCombo()
     if not FrogLib.Combo.Has() then return end
     self.combo = FrogLib.Combo.NewRow(self.frame, function(_, holder)
-        local g = FrogLib.Gauge.New(holder)
-        return g, g.bar
+        local gauge = FrogLib.Gauge.New(holder)
+        return gauge, gauge.bar
     end)
     FrogLib.Combo.Watch(function() self:UpdateCombo() end, function() self:ApplyCombo() end)
 end
@@ -178,60 +171,27 @@ end
 -- FFXIV shows an enemy's cast as a glowing white-gold line floating over the right half of
 -- the bar, with the spell name hanging underneath it.
 function Target:BuildCast()
-    local g = FrogLib.Gauge.New(self.frame)
-    g:SetColor(1, 0.72, 0.30)
-    local c = g.bar
-    c.gauge = g
-    c.label = Text(c)
-    c.label:SetPoint("TOPRIGHT", c, "BOTTOMRIGHT", 0, -3)
-    c.label:SetJustifyH("RIGHT")
+    local gauge = FrogLib.Gauge.New(self.frame)
+    gauge:SetColor(1, 0.72, 0.30)
+    local cast = gauge.bar
+    cast.gauge = gauge
+    cast.label = Text(cast)
+    cast.label:SetPoint("TOPRIGHT", cast, "BOTTOMRIGHT", 0, -3)
+    cast.label:SetJustifyH("RIGHT")
     -- Remaining time, to the left of the cast line. The duration can be secret, so it only
     -- goes straight into SetFormattedText.
-    c.time = Text(c)
-    c.time:SetPoint("RIGHT", c, "LEFT", -8, 0)
-    c.time:SetJustifyH("RIGHT")
-    -- What's on it, as FrogLib's driver decides.
-    c.driver = Cast.NewDriver({
-        show = function(info)
-            Cast.Fill(c, info)
-            c.label:SetText(info.text)
-            if Cast.Locked(info) then
-                g:SetColor(0.6, 0.6, 0.6)
-            else
-                g:SetColor(1, 0.72, 0.3)
-            end
-            c:Show()
-        end,
-        -- Held briefly so an interrupt is visible, as FFXIV does.
-        hold = function(event)
-            c:SetMinMaxValues(0, 1)
-            c:SetValue(1)
-            g:SetColor(0.85, 0.2, 0.15)
-            c.label:SetText(event == "UNIT_SPELLCAST_FAILED" and FAILED or INTERRUPTED)
-        end,
-        -- Unlocked: a sample cast so its position can be judged, unless there's a real one.
-        sample = function()
-            c:SetMinMaxValues(0, 1)
-            c:SetValue(0.6)
-            g:SetColor(1, 0.72, 0.3)
-            c.label:SetText("Spell name")
-            c.time:SetText(ns.db.cast.showTime and "1.4" or "")
-            c:Show()
-        end,
-        hide = function() c:Hide() end,
+    cast.time = Text(cast)
+    cast.time:SetPoint("RIGHT", cast, "LEFT", -8, 0)
+    cast.time:SetJustifyH("RIGHT")
+    -- What's on it, as FrogLib's cast line decides; unlocked, a sample cast so its place can be judged.
+    cast.driver = Cast.NewLine({
+        bar = cast, gauge = gauge, label = cast.label, time = cast.time,
+        showTime = function() return ns.db.cast.showTime end,
         refresh = function() self:UpdateCast() end,
+        sample = { label = "Spell name", value = 0.6, time = "1.4" },
     })
-    c:SetScript("OnUpdate", function(bar)
-        local d = bar.driver
-        if d.sample then return end
-        if not ns.db.cast.showTime or d.holdUntil then
-            bar.time:SetText("")
-            return
-        end
-        Cast.ShowTime(bar, bar.time)
-    end)
-    c:Hide()
-    self.cast = c
+    cast:Hide()
+    self.cast = cast
 end
 
 function Target:BuildToT()
@@ -240,29 +200,26 @@ function Target:BuildToT()
     self.chevrons:SetText(">>>")
     self.chevrons:SetTextColor(0.96, 0.86, 0.56, 0.8)
 
-    local t = CreateFrame("Frame", nil, self.frame)
-    t.gauge = FrogLib.Gauge.New(t)
-    t.name = Text(t)
-    t.name:SetPoint("BOTTOMLEFT", t.gauge.bar, "TOPLEFT", 1, 4)
-    t.name:SetJustifyH("LEFT")
-    t.name:SetWordWrap(false)
-    t.classIcon = t:CreateTexture(nil, "OVERLAY") -- before the name (icons.classToT)
-    t.classIcon:Hide()
-    t:Hide()
-    self.tot = t
+    local tot = CreateFrame("Frame", nil, self.frame)
+    tot.gauge = FrogLib.Gauge.New(tot)
+    tot.name = Text(tot, "LEFT")
+    tot.name:SetPoint("BOTTOMLEFT", tot.gauge.bar, "TOPLEFT", 1, 4)
+    tot.classIcon = tot:CreateTexture(nil, "OVERLAY") -- before the name (icons.classToT)
+    tot.classIcon:Hide()
+    tot:Hide()
+    self.tot = tot
 end
 
 ------------------------------------------------------------------------------
 -- Clicks: left-click targets, right-click opens the unit menu
 ------------------------------------------------------------------------------
 
--- The bars themselves are plain frames, so clicks go to secure buttons laid over them and
--- shown by RegisterUnitWatch (FrogLib.Secure's: right-click opens the unit menu). The buttons copy
--- the bar's position rather than anchoring to it: anything a secure frame is anchored to becomes
--- protected too, and the bar couldn't then be shown or hidden in combat (ADDON_ACTION_BLOCKED on
--- XIVTargetFrame:SetShown).
+-- The bars are plain frames, so clicks go to secure buttons over them (FrogLib.Secure's). They copy the
+-- bar's place: a frame a secure one anchors to turns protected, and couldn't then hide in combat.
+local Secure = FrogLib.Secure
+
 local function ClickButton(name, unit)
-    return (FrogLib.Secure.UnitButton(name, unit, { tooltip = true }))
+    return (Secure.UnitButton(name, unit, { tooltip = true }))
 end
 
 -- Secure frames can only be placed and shown out of combat; changes made in combat wait.
@@ -279,43 +236,34 @@ function Target:SetupClicks()
     end
     -- Off while unlocked, so the bar can be dragged.
     local on = db.clicks and db.locked
-    local function watch(b, active)
-        if active then
-            RegisterUnitWatch(b)
-        else
-            UnregisterUnitWatch(b)
-            b:Hide()
-        end
-    end
 
     -- Same place, scale and size as the bar frame; the hit rect reaches a little past its
     -- edges so the thin gauge is easy to hit.
-    local c = self.click
-    c:SetScale(db.scale)
-    c:ClearAllPoints()
-    c:SetPoint(db.point[1], UIParent, db.point[3], db.point[4], db.point[5])
-    c:SetSize(db.width, self.frame:GetHeight())
-    c:SetHitRectInsets(-2, -2, -2, -(6 + self:PowerDrop())) -- down over a power gauge too
-    watch(c, on)
+    local click = self.click
+    click:SetScale(db.scale)
+    click:ClearAllPoints()
+    click:SetPoint(db.point[1], UIParent, db.point[3], db.point[4], db.point[5])
+    click:SetSize(db.width, self.frame:GetHeight())
+    click:SetHitRectInsets(-2, -2, -2, -(6 + self:PowerDrop())) -- down over a power gauge too
+    Secure.Watch(click, on)
 
     -- Target's target: its gauge starts `gap` past the end of the target bar. Anchoring one
     -- secure button to the other is fine.
-    local t = self.totClick
-    t:SetScale(db.scale)
-    t:ClearAllPoints()
-    t:SetPoint("BOTTOMLEFT", c, "BOTTOMRIGHT", db.tot.gap, 0)
-    t:SetSize(db.tot.width, self.frame:GetHeight())
-    t:SetHitRectInsets(-2, -2, -2, -6)
-    watch(t, on and db.tot.enabled)
+    local totClick = self.totClick
+    totClick:SetScale(db.scale)
+    totClick:ClearAllPoints()
+    totClick:SetPoint("BOTTOMLEFT", click, "BOTTOMRIGHT", db.tot.gap, 0)
+    totClick:SetSize(db.tot.width, self.frame:GetHeight())
+    totClick:SetHitRectInsets(-2, -2, -2, -6)
+    Secure.Watch(totClick, on and db.tot.enabled)
 end
 
 ------------------------------------------------------------------------------
 -- Settings
 ------------------------------------------------------------------------------
 
--- How far the power gauge and its text reach below the health gauge, so the status effects
--- clear them. From the settings alone, not from whether the target has power, so nothing
--- jumps about from one target to the next.
+-- How far the power gauge and its text reach below the health gauge, so the status effects clear
+-- them. From the settings alone, not the target's power, so nothing jumps between targets.
 function Target:PowerDrop()
     local cfg = ns.db.power
     if not cfg.enabled then return 0 end
@@ -340,12 +288,12 @@ function Target:ApplyCombo()
         row.holder:Hide()
         return
     end
-    local c = cfg.color
-    row:Layout(db.width, cfg.height, cfg.spacing, function(g, w, h)
-        g:SetHeight(h)
-        g:SetTexture(db.texture)
-        g.bar:SetWidth(w)
-        g:SetColor(c.r, c.g, c.b)
+    local color = cfg.color
+    row:Layout(db.width, cfg.height, cfg.spacing, function(gauge, width, height)
+        gauge:SetHeight(height)
+        gauge:SetTexture(db.texture)
+        gauge.bar:SetWidth(width)
+        gauge:SetColor(color.r, color.g, color.b)
     end)
     row.holder:ClearAllPoints()
     -- Right under the bar (first), or under its power gauge (which keeps its room whether the
@@ -361,24 +309,24 @@ function Target:UpdateCombo()
 end
 
 function Target:ApplyPower()
-    local db, cfg, p = ns.db, ns.db.power, self.power
-    p:SetHeight(cfg.height)
-    p:SetTexture(db.texture)
-    p.bar:ClearAllPoints()
-    p.bar:SetWidth(math.max(10, db.width * cfg.width / 100))
-    local hp = self.gauge.bar
+    local db, cfg, gauge = ns.db, ns.db.power, self.power
+    gauge:SetHeight(cfg.height)
+    gauge:SetTexture(db.texture)
+    gauge.bar:ClearAllPoints()
+    gauge.bar:SetWidth(math.max(10, db.width * cfg.width / 100))
+    local health = self.gauge.bar
     -- Under the combo points when they come first (combo.first).
     local down = cfg.gap + (db.combo.first and self:ComboDrop() or 0)
     if cfg.align == "right" then
-        p.bar:SetPoint("TOPRIGHT", hp, "BOTTOMRIGHT", cfg.x, -down)
+        gauge.bar:SetPoint("TOPRIGHT", health, "BOTTOMRIGHT", cfg.x, -down)
     elseif cfg.align == "center" then
-        p.bar:SetPoint("TOP", hp, "BOTTOM", cfg.x, -down)
+        gauge.bar:SetPoint("TOP", health, "BOTTOM", cfg.x, -down)
     else
-        p.bar:SetPoint("TOPLEFT", hp, "BOTTOMLEFT", cfg.x, -down)
+        gauge.bar:SetPoint("TOPLEFT", health, "BOTTOMLEFT", cfg.x, -down)
     end
-    ns.Media:SetFont(p.text, db.text.font, cfg.textSize, db.text.outline)
-    p.text:ClearAllPoints()
-    p.text:SetPoint("TOPRIGHT", p.bar, "BOTTOMRIGHT", -1, -2)
+    ns.Media:SetFont(gauge.text, db.text.font, cfg.textSize, db.text.outline)
+    gauge.text:ClearAllPoints()
+    gauge.text:SetPoint("TOPRIGHT", gauge.bar, "BOTTOMRIGHT", -1, -2)
 end
 
 -- The name of your target's target, after its class icon when that's shown.
@@ -400,14 +348,14 @@ function Target:PlaceToTName()
 end
 
 function Target:Apply()
-    local db, t = ns.db, ns.db.text
-    local f = self.frame
-    f:SetScale(db.scale)
-    f:SetWidth(db.width)
-    f:ClearAllPoints()
-    f:SetPoint(db.point[1], UIParent, db.point[3], db.point[4], db.point[5])
-    f:EnableMouse(not db.locked)
-    f.unlockTint:SetShown(not db.locked)
+    local db, text = ns.db, ns.db.text
+    local frame = self.frame
+    frame:SetScale(db.scale)
+    frame:SetWidth(db.width)
+    frame:ClearAllPoints()
+    frame:SetPoint(db.point[1], UIParent, db.point[3], db.point[4], db.point[5])
+    frame:EnableMouse(not db.locked)
+    frame.unlockTint:SetShown(not db.locked)
     -- Blizzard's combo points (drawn on its target frame) stay, unless ours are on: then they'd
     -- be shown twice (and another addon hiding them couldn't).
     local ownCombo = self.combo and db.combo.enabled
@@ -415,22 +363,22 @@ function Target:Apply()
 
     self.gauge:SetHeight(db.height)
     self.gauge:SetTexture(db.texture)
-    ns.Media:SetFont(self.left, t.font, t.size, t.outline)
-    ns.Media:SetFont(self.right, t.font, t.size, t.outline)
+    ns.Media:SetNameFont(self.left, text.font, text.size, text.outline) -- the name: other scripts draw too
+    ns.Media:SetFont(self.right, text.font, text.size, text.outline)
     self.left:SetWidth(db.width * 0.72) -- long names truncate before reaching the right text
 
     self:ApplyPower()
 
-    local c = self.cast
-    c:ClearAllPoints()
-    c:SetPoint("BOTTOMRIGHT", self.gauge.bar, "TOPRIGHT", 0, db.cast.offset)
-    c:SetWidth(db.cast.width)
-    ns.Media:SetFont(c.time, t.font, t.size, t.outline)
-    c.time:SetTextColor(1, 0.95, 0.85)
-    c.gauge:SetHeight(db.cast.height)
-    c.gauge:SetTexture(db.texture)
-    ns.Media:SetFont(c.label, t.font, t.size + 2, t.outline)
-    c.label:SetTextColor(1, 0.95, 0.85)
+    local cast = self.cast
+    cast:ClearAllPoints()
+    cast:SetPoint("BOTTOMRIGHT", self.gauge.bar, "TOPRIGHT", 0, db.cast.offset)
+    cast:SetWidth(db.cast.width)
+    ns.Media:SetFont(cast.time, text.font, text.size, text.outline)
+    cast.time:SetTextColor(1, 0.95, 0.85)
+    cast.gauge:SetHeight(db.cast.height)
+    cast.gauge:SetTexture(db.texture)
+    ns.Media:SetFont(cast.label, text.font, text.size + 2, text.outline)
+    cast.label:SetTextColor(1, 0.95, 0.85)
 
     local tot = self.tot
     tot.gauge:SetHeight(db.height)
@@ -439,13 +387,13 @@ function Target:Apply()
     tot.gauge.bar:SetPoint("BOTTOMLEFT", self.gauge.bar, "BOTTOMRIGHT", db.tot.gap, 0)
     tot.gauge.bar:SetWidth(db.tot.width)
     self:PlaceToTName()
-    ns.Media:SetFont(tot.name, t.font, t.size - 1, t.outline)
-    ns.Media:SetFont(self.chevrons, t.font, math.max(8, t.size - 3), t.outline)
+    ns.Media:SetNameFont(tot.name, text.font, text.size - 1, text.outline)
+    ns.Media:SetFont(self.chevrons, text.font, math.max(8, text.size - 3), text.outline)
     self.chevrons:ClearAllPoints()
     self.chevrons:SetPoint("CENTER", self.gauge.bar, "RIGHT", db.tot.gap / 2, 0)
 
     self:ApplyCombo()
-    ns.Auras:Apply(f, self.gauge.bar, 6 + self:PowerDrop() + self:ComboDrop())
+    ns.Auras:Apply(frame, self.gauge.bar, 6 + self:PowerDrop() + self:ComboDrop())
     self:SetupClicks()
     self:Update(true)
     -- A font file is loaded on first use, and text set in that same moment can render blank;
@@ -466,19 +414,19 @@ function Target:Update(instant)
     if not exists and not preview then return end
 
     local unit = exists and "target" or nil
-    local g = self.gauge
+    local gauge = self.gauge
     if preview then
-        g:SetValues(FAKE.value, FAKE.max, true)
-        g:SetAbsorb(FAKE.shield, FAKE.max)
+        gauge:SetValues(FAKE.value, FAKE.max, true)
+        gauge:SetAbsorb(FAKE.shield, FAKE.max)
     else
         local max = UnitHealthMax("target")
-        g:SetValues(UnitHealth("target"), max, instant)
+        gauge:SetValues(UnitHealth("target"), max, instant)
         -- The shield total can be secret; it only ever goes into the gauge's status bars.
-        g:SetAbsorb((UnitGetTotalAbsorbs and UnitGetTotalAbsorbs("target")) or 0, max)
+        gauge:SetAbsorb((UnitGetTotalAbsorbs and UnitGetTotalAbsorbs("target")) or 0, max)
     end
-    g:ShowAbsorb(db.absorb)
+    gauge:ShowAbsorb(db.absorb)
     local r, g, b = BarColor(unit)
-    self.gauge:SetColor(r, g, b)
+    gauge:SetColor(r, g, b)
     ns.SetUnitText(self.left, db.text.left, unit, preview and FAKE)
     ns.SetUnitText(self.right, db.text.right, unit, preview and FAKE)
     TintText(self.left, r, g, b)
@@ -503,11 +451,8 @@ function Target:UpdatePowerWords()
     end
 end
 
--- An empty power gauge fades out (power.hideEmpty): a unit that's generated nothing and spent
--- nothing has no use for it. When the power can be read, a new target at 0 has it gone at
--- once, and one that drops to 0 keeps it for EMPTY_WAIT seconds first (rage ebbing between
--- swings). In combat the power can be secret, so a curve over its percent becomes the gauge's
--- opacity instead, engine-side: 0 when empty, 1 otherwise.
+-- An empty power gauge fades (power.hideEmpty): a new target at 0 at once, one dropping to 0 after
+-- EMPTY_WAIT seconds (rage ebbing between swings). Secret power (combat): a curve over its percent instead.
 local EMPTY_WAIT = 3
 
 function Target:EmptyAlpha(unit, instant)
@@ -532,15 +477,15 @@ function Target:EmptyAlpha(unit, instant)
         end
         return 1
     end
-    local a = Curve.Power(unit, Curve.Empty())
-    if issecret(a) or a ~= nil then return a end
+    local alpha = Curve.Power(unit, Curve.Empty())
+    if issecret(alpha) or alpha ~= nil then return alpha end
     return 1
 end
 
 -- Values may be secret: they only go into the gauge and SetFormattedText. A unit with no power
 -- at all (a critter) shows none, when that much can be told. Unlocked with no target: a sample.
 function Target:UpdatePower(instant)
-    local p, cfg = self.power, ns.db.power
+    local gauge, cfg = self.power, ns.db.power
     local unit = UnitExists("target") and "target" or nil
     local show = cfg.enabled and (unit ~= nil or not ns.db.locked)
     if show and unit then
@@ -548,18 +493,18 @@ function Target:UpdatePower(instant)
         if Safe(max) == 0 then
             show = false
         else
-            p:SetValues(UnitPower(unit), max, instant)
+            gauge:SetValues(UnitPower(unit), max, instant)
         end
     elseif show then
-        p:SetValues(FAKE.power, FAKE.powermax, true)
+        gauge:SetValues(FAKE.power, FAKE.powermax, true)
     end
-    p.bar:SetShown(show)
+    gauge.bar:SetShown(show)
     if not show then return end
-    p.bar:SetAlpha(self:EmptyAlpha(unit, instant))
+    gauge.bar:SetAlpha(self:EmptyAlpha(unit, instant))
     local r, g, b = Color.Power(unit)
-    p:SetColor(r, g, b)
-    ns.SetUnitText(p.text, cfg.text, unit, not unit and FAKE or nil, true)
-    TintText(p.text, r, g, b)
+    gauge:SetColor(r, g, b)
+    ns.SetUnitText(gauge.text, cfg.text, unit, not unit and FAKE or nil, true)
+    TintText(gauge.text, r, g, b)
 end
 
 -- Where the icon row starts, and which way it grows:
@@ -573,46 +518,46 @@ local ICON_ANCHORS = {
 -- Shown icons line up from the chosen anchor, offset by the x/y setting. unit nil = preview.
 function Target:UpdateIcons(unit)
     local cfg = ns.db.icons
-    local a = ICON_ANCHORS[cfg.anchor] or ICON_ANCHORS.left
-    local relative = a[2] == "bar" and self.gauge.bar or self.left
-    local prev
+    local anchor = ICON_ANCHORS[cfg.anchor] or ICON_ANCHORS.left
+    local relative = anchor[2] == "bar" and self.gauge.bar or self.left
+    local previous
     for _, key in ipairs(ICON_ORDER) do
-        local tex = self.icons[key]
+        local icon = self.icons[key]
         local size = key == "class" and cfg.classSize or cfg.size
         local shown = false
         if cfg.enabled and cfg[key] then
             if unit then
-                shown = Icons.SHOW[key](tex, unit, size)
+                shown = Icons.SHOW[key](icon, unit, size)
             elseif Icons.PREVIEW[key] then
-                shown = Icons.PREVIEW[key](tex, size)
+                shown = Icons.PREVIEW[key](icon, size)
             end
         end
-        tex:SetShown(shown)
+        icon:SetShown(shown)
         if shown then
-            if tex:GetObjectType() == "Texture" then tex:SetSize(size, size) end
-            tex:ClearAllPoints()
-            if prev then
-                if a[6] < 0 then
-                    tex:SetPoint("RIGHT", prev, "LEFT", -2, 0)
+            if icon:GetObjectType() == "Texture" then icon:SetSize(size, size) end
+            icon:ClearAllPoints()
+            if previous then
+                if anchor[6] < 0 then
+                    icon:SetPoint("RIGHT", previous, "LEFT", -2, 0)
                 else
-                    tex:SetPoint("LEFT", prev, "RIGHT", 2, 0)
+                    icon:SetPoint("LEFT", previous, "RIGHT", 2, 0)
                 end
             else
-                tex:SetPoint(a[1], relative, a[3], a[4] + cfg.x, a[5] + cfg.y)
+                icon:SetPoint(anchor[1], relative, anchor[3], anchor[4] + cfg.x, anchor[5] + cfg.y)
             end
-            prev = tex
+            previous = icon
         end
     end
 end
 
-function Target:UpdateCast(event)
-    local c = self.cast
+function Target:UpdateCast(event, interruptedBy)
+    local cast = self.cast
     if not ns.db.cast.enabled then
-        c:Hide()
+        cast:Hide()
         return
     end
     local exists = UnitExists("target")
-    c.driver:Update((issecret(exists) or exists) and "target" or nil, event, not ns.db.locked)
+    cast.driver:Update((issecret(exists) or exists) and "target" or nil, event, not ns.db.locked, interruptedBy)
 end
 
 function Target:UpdateToT()
@@ -627,8 +572,8 @@ function Target:UpdateToT()
             FAKE_TOT.class, FAKE_TOT.classFile = UnitClass("player")
             tot.gauge:SetValues(FAKE_TOT.value, FAKE_TOT.max, true)
             if ns.db.colorMode == "xiv" then
-                local c = Color.XIV.friend
-                r, g, b = c.r, c.g, c.b
+                local friend = Color.XIV.friend
+                r, g, b = friend.r, friend.g, friend.b
             else
                 r, g, b = BarColor(nil)
             end

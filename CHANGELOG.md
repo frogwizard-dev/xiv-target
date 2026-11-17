@@ -1,5 +1,14 @@
 # XIVTarget
 
+## 0.7.1
+
+- An interrupted channel on your target or focus shows red "Interrupted", and a red bar no longer carries over to your new target.
+- Hiding your target's nameplate listens to nothing while it's off, and compares plates rather than asking a question the game can keep secret. It works from login again (it had waited for a setting to change).
+- The target of target is drawn in full when it changes and once a second, only its health in between.
+- Names in Russian, Korean or Chinese draw in every font.
+- Shift-, ctrl- and alt-click on the bars now target too; the gamepad UI's target menu stays open.
+- Shared code (FrogLib 1.12.0): see its notes for the rest of what's fixed.
+
 ## 0.7.0
 
 - New option on the Bar page: **Hide your target's nameplate**, so the target bar is the only bar showing for it (no second bar floating over its head). Works with Blizzard's nameplates and nameplate addons, and in combat. Off to start with.

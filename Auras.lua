@@ -13,24 +13,24 @@ local SORT_DIR = AuraContainerSortDirection and AuraContainerSortDirection.Norma
 local container, signature, keys
 local styled = {}
 
-local A = FrogLib.Auras -- the rows' building blocks (FrogLib's Auras.lua)
+local AuraKit = FrogLib.Auras -- the rows' building blocks (FrogLib's Auras.lua)
 
-local function StyleButton(d)
-    local cfg, t = ns.db.auras, ns.db.text
-    if d.size ~= cfg.size and pcall(d.button.SetSize, d.button, cfg.size, cfg.size) then
-        d.size = cfg.size
+local function StyleButton(slot)
+    local cfg, text = ns.db.auras, ns.db.text
+    if slot.size ~= cfg.size and pcall(slot.button.SetSize, slot.button, cfg.size, cfg.size) then
+        slot.size = cfg.size
     end
-    local font, size = cfg.font or t.font, math.max(9, math.floor(cfg.size * 0.46))
-    ns.Media:SetFont(d.stack, font, size, t.outline)
-    ns.Media:SetFont(d.duration, font, size, t.outline)
-    d.duration:SetShown(cfg.showTimer)
+    local font, size = cfg.font or text.font, math.max(9, math.floor(cfg.size * 0.46))
+    ns.Media:SetFont(slot.stack, font, size, text.outline)
+    ns.Media:SetFont(slot.duration, font, size, text.outline)
+    slot.duration:SetShown(cfg.showTimer)
 end
 
 local function MakeInit(harmful)
     return function(button)
         -- FFXIV prints the timer under the icon rather than on it.
-        local d = A.InitButton(button, { border = harmful and { 0.75, 0.12, 0.08 } or nil, style = StyleButton })
-        table.insert(styled, d)
+        local slot = AuraKit.InitButton(button, { border = harmful and { 0.75, 0.12, 0.08 } or nil, style = StyleButton })
+        table.insert(styled, slot)
     end
 end
 
@@ -47,33 +47,33 @@ end
 -- top: how far below the anchor's bottom edge the icons start.
 local function Build(parent, anchor, top)
     local cfg = ns.db.auras
-    A.Release(container)
+    AuraKit.Release(container)
     container = nil
-    local c = A.NewContainer(parent)
-    if not c then return end
+    local built = AuraKit.NewContainer(parent)
+    if not built then return end
 
-    c:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, -top)
-    A.Flow(c, "TOPLEFT", "RIGHT", "DOWN")
+    built:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, -top)
+    AuraKit.Flow(built, "TOPLEFT", "RIGHT", "DOWN")
 
     wipe(styled)
     keys = {}
     local layout = Layout(cfg)
-    local function add(key, filter, harmful)
-        local ok2, err = pcall(c.AddAuraGroup, c, key, filter, {
+    local function Add(key, filter, harmful)
+        local ok, err = pcall(built.AddAuraGroup, built, key, filter, {
             maxFrameCount = cfg.max, sortMethod = SORT, sortDirection = SORT_DIR,
             initializeFrame = MakeInit(harmful), layout = layout,
         })
-        if ok2 then keys[#keys + 1] = key else ns.Print("Couldn't set up status effects:", err) end
+        if ok then keys[#keys + 1] = key else ns.Print("Couldn't set up status effects:", err) end
     end
     -- Your own debuffs first, like FFXIV; then everyone else's; then the target's buffs.
-    add("mine", "HARMFUL|PLAYER", true)
+    Add("mine", "HARMFUL|PLAYER", true)
     if cfg.mode == "all" then
-        add("others", "HARMFUL|!PLAYER", true)
-        add("buffs", "HELPFUL", false)
+        Add("others", "HARMFUL|!PLAYER", true)
+        Add("buffs", "HELPFUL", false)
     end
-    c:SetUnit("target")
-    c:UpdateAllAuras()
-    container = c
+    built:SetUnit("target")
+    built:UpdateAllAuras()
+    container = built
     signature = Signature(cfg, top)
 end
 
@@ -90,9 +90,9 @@ function Auras:Apply(parent, anchor, top)
     for _, key in ipairs(keys) do
         pcall(container.SetAuraGroupLayout, container, key, layout)
     end
-    A.SetLineSize(container, ns.db.width + 0.4)
+    AuraKit.SetLineSize(container, ns.db.width + 0.4)
     container:SetShown(cfg.enabled)
-    for _, d in ipairs(styled) do pcall(StyleButton, d) end
+    for _, slot in ipairs(styled) do pcall(StyleButton, slot) end
 end
 
 -- The container is bound to the "target" token; a new target needs a fresh parse.
